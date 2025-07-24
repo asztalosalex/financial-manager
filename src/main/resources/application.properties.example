@@ -1,0 +1,16 @@
+spring.application.name=financial-manager
+spring.security.user.name=
+spring.security.user.password=
+
+security.jwt.secret-key=
+security.jwt.expiration-time=60
+
+spring.datasource.url=jdbc:h2:file:./data/financedb
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=
+spring.datasource.password=
+
+spring.jpa.hibernate.ddl-auto=update
+spring.h2.console.enabled=true
+logging.level.org.springdoc=DEBUG
+logging.level.org.springframework.web=DEBUG
