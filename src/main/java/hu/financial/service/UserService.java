@@ -6,6 +6,7 @@ import hu.financial.exception.user.DuplicateUserException;
 import hu.financial.exception.user.UserNotFoundException;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -20,10 +21,11 @@ public class UserService {
   
     
     public List<User> getAllUsers() {
-        if (userRepository.findAll().isEmpty()) {
+        List<User> users = userRepository.findAll();
+        if (users.isEmpty()) {
             throw new UserNotFoundException("No users found");
         }
-        return userRepository.findAll();
+        return users;
     }
     
     public User getUserById(Long id) {
@@ -69,5 +71,9 @@ public class UserService {
                 throw new DuplicateUserException("email", userDetails.getEmail());
             }
         }
+    }
+
+    public boolean isUserLoggedIn() {
+        return userRepository.findByUsername(SecurityContextHolder.getContext().getAuthentication().getName()) != null;
     }
 } 

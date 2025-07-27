@@ -5,10 +5,12 @@ import hu.financial.service.UserService;
 import hu.financial.exception.user.UserNotFoundException;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -19,6 +21,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class UserControllerTest {
 
     @Mock
@@ -27,12 +30,6 @@ class UserControllerTest {
     @InjectMocks
     private UserController userController;
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
-
-    
 
     @Test
     void getAllUsers_WithUsers_ReturnsUsers() {
@@ -42,6 +39,7 @@ class UserControllerTest {
             new User("user2", "pass2", "user2@example.com")
         );
         when(userService.getAllUsers()).thenReturn(users);
+
 
         // Act
         ResponseEntity<List<User>> response = userController.getAllUsers();
