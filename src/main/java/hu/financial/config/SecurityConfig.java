@@ -33,7 +33,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.DELETE).hasRole("ADMIN")
                 .requestMatchers("/admin/**").hasAnyRole("ADMIN")
-                .requestMatchers("/api/users/loggedin-users").hasAnyRole("ADMIN")
+                .requestMatchers("/api/users/**").authenticated()
                 .requestMatchers("/api/auth/**").permitAll()
                 .anyRequest().authenticated())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
