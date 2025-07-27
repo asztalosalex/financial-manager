@@ -26,7 +26,7 @@ public class Budget {
     @Column(name = "amount", nullable = false)
     private Double amount;
 
-    @Column(name ="month", nullable = false)
+    @Column(name = "month_value", nullable = false)
     private YearMonth month;
 
     @ManyToOne
