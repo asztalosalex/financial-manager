@@ -144,13 +144,18 @@ After this, the app is available at `https://frontend.fmanager.local` and the AP
 
 ### Environment Variables
 
-Create a `.env` file in the root directory:
+Copy `.env.example` to `.env` in the root directory and fill in the values:
 
 ```env
 POSTGRES_USER=your_username
 POSTGRES_PASSWORD=your_password
 POSTGRES_DB=financial_manager
+
+SECURITY_JWT_SECRET_KEY=your_secret_key
+SECURITY_JWT_EXPIRATION_TIME=3600
 ```
+
+Generate a strong `SECURITY_JWT_SECRET_KEY` with `openssl rand -hex 32`. `SECURITY_JWT_EXPIRATION_TIME` is the token lifetime in seconds.
 
 ## License
 
