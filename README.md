@@ -43,10 +43,10 @@ The backend is a Spring Boot application providing REST APIs for:
    docker-compose up -d
    ```
 
-2. **Using Maven**:
+2. **Using Maven** (requires JDK 21 and Maven 3.9+ installed):
    ```bash
    cd backend
-   ./mvnw spring-boot:run
+   mvn spring-boot:run
    ```
 
 The API will be available at `http://localhost:8080`
