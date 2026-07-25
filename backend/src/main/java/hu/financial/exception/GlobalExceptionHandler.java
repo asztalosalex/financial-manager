@@ -11,6 +11,13 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import hu.financial.exception.user.DuplicateUserException;
 import hu.financial.exception.user.UserNotFoundException;
 import hu.financial.exception.user.UserValidationException;
+import hu.financial.exception.category.CategoryNotFoundException;
+import hu.financial.exception.category.CategoryValidationException;
+import hu.financial.exception.category.DuplicateCategoryException;
+import hu.financial.exception.budget.BudgetNotFoundException;
+import hu.financial.exception.budget.BudgetValidationException;
+import hu.financial.exception.transaction.TransactionNotFoundException;
+import hu.financial.exception.transaction.TransactionValidationException;
 import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
 
@@ -98,6 +105,51 @@ public class GlobalExceptionHandler {
                 request.getDescription(false)
         );
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler({
+            CategoryNotFoundException.class,
+            BudgetNotFoundException.class,
+            TransactionNotFoundException.class
+    })
+    public ResponseEntity<ErrorResponse> handleResourceNotFound(
+            RuntimeException ex, WebRequest request) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                "Not Found",
+                ex.getMessage(),
+                request.getDescription(false)
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler({
+            CategoryValidationException.class,
+            BudgetValidationException.class,
+            TransactionValidationException.class,
+            IllegalArgumentException.class
+    })
+    public ResponseEntity<ErrorResponse> handleDomainValidation(
+            RuntimeException ex, WebRequest request) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "Validation Error",
+                ex.getMessage(),
+                request.getDescription(false)
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(DuplicateCategoryException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateResource(
+            DuplicateCategoryException ex, WebRequest request) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.CONFLICT.value(),
+                "Duplicate Resource",
+                ex.getMessage(),
+                request.getDescription(false)
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
     }
 
     @ExceptionHandler(Exception.class)

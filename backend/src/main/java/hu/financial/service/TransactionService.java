@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import hu.financial.repository.TransactionRepository;
 import hu.financial.model.Transaction;
 import hu.financial.exception.transaction.TransactionNotFoundException;
+import hu.financial.exception.transaction.TransactionValidationException;
 import hu.financial.dto.transaction.CreateTransactionDto;
 import hu.financial.dto.transaction.TransactionResponseDto;
 
@@ -35,11 +36,13 @@ public class TransactionService {
   }
 
   public Transaction getTransactionById(Long id) {
-    return transactionRepository.findById(id).orElse(null);
+    return transactionRepository.findById(id)
+        .orElseThrow(() -> new TransactionNotFoundException(id));
   }
 
   public Transaction updateTransaction(Long id, Transaction transaction) {
-    Transaction existingTransaction = transactionRepository.findById(id).orElse(null);
+    Transaction existingTransaction = transactionRepository.findById(id)
+        .orElseThrow(() -> new TransactionNotFoundException(id));
     validateTransactionForUpdate(existingTransaction, transaction);
     existingTransaction.setAmount(transaction.getAmount());
     existingTransaction.setDescription(transaction.getDescription());
@@ -48,7 +51,7 @@ public class TransactionService {
 
   private void validateTransactionForCreation(Transaction transaction) {
     if (transaction.getAmount() <= 0) {
-      throw new IllegalArgumentException("Transaction amount must be greater than 0");
+      throw new TransactionValidationException("Transaction amount must be greater than 0");
     }
   }
 
@@ -57,12 +60,14 @@ public class TransactionService {
   }
 
   public void deleteTransaction(Long id) {
-    transactionRepository.deleteById(id);
+    Transaction existingTransaction = transactionRepository.findById(id)
+        .orElseThrow(() -> new TransactionNotFoundException(id));
+    transactionRepository.delete(existingTransaction);
   }
 
   private void validateTransactionForUpdate(Transaction existingTransaction, Transaction transaction) {
     if (transaction.getAmount() <= 0) {
-      throw new IllegalArgumentException("Transaction amount must be greater than 0");
+      throw new TransactionValidationException("Transaction amount must be greater than 0");
     }
   }
 

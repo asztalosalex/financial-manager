@@ -16,6 +16,8 @@ import org.springframework.http.HttpStatus;
 import jakarta.validation.Valid;
 import hu.financial.model.Transaction;
 import hu.financial.service.TransactionService;
+import hu.financial.service.UserService;
+import hu.financial.exception.transaction.TransactionNotFoundException;
 import hu.financial.dto.transaction.CreateTransactionDto;
 import hu.financial.dto.transaction.TransactionResponseDto;
 import java.util.List;
@@ -29,6 +31,9 @@ public class TransactionController {
     @Autowired
     private TransactionService transactionService;
 
+    @Autowired
+    private UserService userService;
+
     @Operation(summary = "Create a new transaction")
     @PostMapping
     public ResponseEntity<TransactionResponseDto> createTransaction(@Valid @RequestBody CreateTransactionDto dto) {
@@ -37,41 +42,44 @@ public class TransactionController {
         return ResponseEntity.status(HttpStatus.CREATED).body(transactionService.mapToDto(savedTransaction));
     }
 
-    @Operation(summary = "Get all transactions")
+    @Operation(summary = "Get the current user's transactions")
     @GetMapping
-    public ResponseEntity<List<TransactionResponseDto>> getAllTransactions() {
-        List<TransactionResponseDto> transactions = transactionService.getAllTransactions()
+    public ResponseEntity<List<TransactionResponseDto>> getMyTransactions() {
+        Long userId = userService.getCurrentUser().getId();
+        List<TransactionResponseDto> transactions = transactionService.getTransactionsByUserId(userId)
                 .stream().map(transactionService::mapToDto).collect(Collectors.toList());
         return ResponseEntity.ok(transactions);
     }
 
-    @Operation(summary = "Get a transaction by id")
+    @Operation(summary = "Get one of the current user's transactions by id")
     @GetMapping("/{id}")
     public ResponseEntity<TransactionResponseDto> getTransactionById(@PathVariable Long id) {
-        Transaction transaction = transactionService.getTransactionById(id);
-        TransactionResponseDto responseDto = transaction == null ? null : transactionService.mapToDto(transaction);
-        return ResponseEntity.ok(responseDto);
+        Transaction transaction = getOwnedTransaction(id);
+        return ResponseEntity.ok(transactionService.mapToDto(transaction));
     }
 
-    @Operation(summary = "Update a transaction by id")
+    @Operation(summary = "Update one of the current user's transactions by id")
     @PutMapping("/{id}")
     public ResponseEntity<TransactionResponseDto> updateTransaction(@PathVariable Long id, @Valid @RequestBody CreateTransactionDto dto) {
+        getOwnedTransaction(id);
         Transaction updatedTransaction = transactionService.updateTransaction(id, transactionService.mapToEntity(dto));
         return ResponseEntity.ok(transactionService.mapToDto(updatedTransaction));
     }
 
-    @Operation(summary = "Delete a transaction by id")
+    @Operation(summary = "Delete one of the current user's transactions by id")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTransaction(@PathVariable Long id) {
+        getOwnedTransaction(id);
         transactionService.deleteTransaction(id);
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Get transactions by user id")
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<TransactionResponseDto>> getTransactionsByUserId(@PathVariable Long userId) {
-        List<TransactionResponseDto> transactions = transactionService.getTransactionsByUserId(userId)
-                .stream().map(transactionService::mapToDto).collect(Collectors.toList());
-        return ResponseEntity.ok(transactions);
+    private Transaction getOwnedTransaction(Long id) {
+        Long userId = userService.getCurrentUser().getId();
+        Transaction transaction = transactionService.getTransactionById(id);
+        if (transaction == null || !transaction.getUser().getId().equals(userId)) {
+            throw new TransactionNotFoundException(id);
+        }
+        return transaction;
     }
 }

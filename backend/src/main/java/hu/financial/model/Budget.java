@@ -1,6 +1,6 @@
 package hu.financial.model;
 
-import java.time.YearMonth;
+import java.time.LocalDate;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -28,7 +28,7 @@ public class Budget {
     private Double amount;
 
     @Column(name = "month_value", nullable = false)
-    private YearMonth month;
+    private LocalDate month;
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)

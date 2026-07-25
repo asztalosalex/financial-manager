@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import org.junit.jupiter.api.BeforeEach;
-import java.time.YearMonth;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Arrays;
 import java.util.Optional;
@@ -38,7 +38,7 @@ public class BudgetServiceTest {
         testUser.setId(1L);
         testCategory = new Category("testcategory", "testdescription", testUser);
         testCategory.setId(1L);
-        testBudget = new Budget(1L, 100.0, YearMonth.now(), testUser, testCategory);
+        testBudget = new Budget(1L, 100.0, LocalDate.now(), testUser, testCategory);
     }
 
     @Test
@@ -94,7 +94,8 @@ public class BudgetServiceTest {
     @Test
     void deleteBudget_ShouldReturnVoid_WhenValidBudget() {
         // Arrange
-        doNothing().when(budgetRepository).deleteById(testBudget.getId());
+        when(budgetRepository.findById(testBudget.getId())).thenReturn(Optional.of(testBudget));
+        doNothing().when(budgetRepository).delete(testBudget);
 
         // Act
         budgetService.deleteBudget(testBudget.getId());

@@ -6,7 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.YearMonth;
+import java.time.LocalDate;
 
 @Data
 @NoArgsConstructor
@@ -18,7 +18,7 @@ public class CreateBudgetDto {
     private Double amount;
 
     @NotNull(message = "Budget month is required")
-    private YearMonth month;
+    private LocalDate month;
 
     @NotNull(message = "Category id is required")
     private Long categoryId;

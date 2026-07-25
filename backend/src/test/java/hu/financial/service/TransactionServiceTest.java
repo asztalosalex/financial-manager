@@ -104,13 +104,14 @@ public class TransactionServiceTest {
     @Test
     void deleteTransaction_ShouldReturnVoid_WhenValidTransaction() {
         // Arrange
-        doNothing().when(transactionRepository).deleteById(testTransaction.getId());
+        when(transactionRepository.findById(testTransaction.getId())).thenReturn(Optional.of(testTransaction));
+        doNothing().when(transactionRepository).delete(testTransaction);
 
         // Act
         transactionService.deleteTransaction(testTransaction.getId());
 
         // Assert
-        verify(transactionRepository, times(1)).deleteById(testTransaction.getId());
+        verify(transactionRepository, times(1)).delete(testTransaction);
     }
 
     @Test
