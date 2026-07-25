@@ -30,7 +30,8 @@ public class CategoryService {
     }
 
     public Category updateCategory(Category category) {
-        Category existingCategory = categoryRepository.findById(category.getId()).orElse(null); 
+        Category existingCategory = categoryRepository.findById(category.getId())
+                .orElseThrow(() -> new CategoryNotFoundException(category.getId()));
         validateCategoryForUpdate(existingCategory, category);
         existingCategory.setName(category.getName());
         existingCategory.setDescription(category.getDescription());

@@ -18,6 +18,8 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.time.LocalDate;
 import hu.financial.model.enums.TransactionType;
+import hu.financial.exception.transaction.TransactionNotFoundException;
+import hu.financial.exception.transaction.TransactionValidationException;
 
 @ExtendWith(MockitoExtension.class)
 public class TransactionServiceTest {
@@ -126,5 +128,37 @@ public class TransactionServiceTest {
         assertNotNull(result);
         assertEquals(Arrays.asList(testTransaction), result);
         verify(transactionRepository, times(1)).findByUserId(testUser.getId());
+    }
+
+    @Test
+    void createTransaction_ShouldThrowValidation_WhenAmountNotPositive() {
+        Transaction invalid = new Transaction(2L, testTransactionType, "invalid",
+                testCategory, testUser, 0.0, LocalDate.now());
+
+        assertThrows(TransactionValidationException.class, () -> transactionService.createTransaction(invalid));
+        verify(transactionRepository, never()).save(any(Transaction.class));
+    }
+
+    @Test
+    void getTransactionById_ShouldThrowNotFound_WhenMissing() {
+        when(transactionRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(TransactionNotFoundException.class, () -> transactionService.getTransactionById(99L));
+    }
+
+    @Test
+    void updateTransaction_ShouldThrowNotFound_WhenMissing() {
+        when(transactionRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(TransactionNotFoundException.class, () -> transactionService.updateTransaction(99L, testTransaction));
+        verify(transactionRepository, never()).save(any(Transaction.class));
+    }
+
+    @Test
+    void deleteTransaction_ShouldThrowNotFound_WhenMissing() {
+        when(transactionRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(TransactionNotFoundException.class, () -> transactionService.deleteTransaction(99L));
+        verify(transactionRepository, never()).delete(any(Transaction.class));
     }
 }

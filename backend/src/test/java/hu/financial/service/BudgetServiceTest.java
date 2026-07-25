@@ -9,6 +9,8 @@ import hu.financial.repository.BudgetRepository;
 import hu.financial.model.Budget;
 import hu.financial.model.User;
 import hu.financial.model.Category;
+import hu.financial.exception.budget.BudgetNotFoundException;
+import hu.financial.exception.budget.BudgetValidationException;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -17,7 +19,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Arrays;
 import java.util.Optional;
-
 
 @ExtendWith(MockitoExtension.class)
 public class BudgetServiceTest {
@@ -42,62 +43,95 @@ public class BudgetServiceTest {
     }
 
     @Test
-    void createBudget_ShouldReturnBudget_WhenValidBudget() {
-        // Arrange
+    void createBudget_ShouldReturnSavedBudget_WhenValid() {
         when(budgetRepository.save(any(Budget.class))).thenReturn(testBudget);
 
-        // Act
         Budget result = budgetService.createBudget(testBudget);
 
-        // Assert
-        assertNotNull(result);
+        assertEquals(testBudget, result);
+        verify(budgetRepository).save(testBudget);
     }
 
     @Test
-    void getAllBudgets_ShouldReturnListOfBudgets_WhenBudgetsExist() {
-        // Arrange
+    void createBudget_ShouldThrowValidation_WhenAmountNotPositive() {
+        Budget invalid = new Budget(2L, 0.0, LocalDate.now(), testUser, testCategory);
+
+        assertThrows(BudgetValidationException.class, () -> budgetService.createBudget(invalid));
+        verify(budgetRepository, never()).save(any(Budget.class));
+    }
+
+    @Test
+    void getAllBudgets_ShouldReturnList_WhenBudgetsExist() {
         when(budgetRepository.findAll()).thenReturn(Arrays.asList(testBudget));
 
-        // Act
         List<Budget> result = budgetService.getAllBudgets();
 
-        // Assert
-        assertNotNull(result);
+        assertEquals(Arrays.asList(testBudget), result);
+        verify(budgetRepository).findAll();
     }
 
+    @Test
+    void getBudgetsByUserId_ShouldReturnList_WhenBudgetsExist() {
+        when(budgetRepository.findByUserId(testUser.getId())).thenReturn(Arrays.asList(testBudget));
+
+        List<Budget> result = budgetService.getBudgetsByUserId(testUser.getId());
+
+        assertEquals(Arrays.asList(testBudget), result);
+        verify(budgetRepository).findByUserId(testUser.getId());
+    }
 
     @Test
-    void getBudgetById_ShouldReturnBudget_WhenValidBudget() {
-        // Arrange
+    void getBudgetById_ShouldReturnBudget_WhenExists() {
         when(budgetRepository.findById(testBudget.getId())).thenReturn(Optional.of(testBudget));
 
-        // Act
         Budget result = budgetService.getBudgetById(testBudget.getId());
 
-        // Assert
-        assertNotNull(result);
+        assertEquals(testBudget, result);
+        verify(budgetRepository).findById(testBudget.getId());
     }
 
     @Test
-    void updateBudget_ShouldReturnBudget_WhenValidBudget() {
-        // Arrange
+    void getBudgetById_ShouldThrowNotFound_WhenMissing() {
+        when(budgetRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(BudgetNotFoundException.class, () -> budgetService.getBudgetById(99L));
+    }
+
+    @Test
+    void updateBudget_ShouldReturnUpdatedBudget_WhenExists() {
         when(budgetRepository.findById(testBudget.getId())).thenReturn(Optional.of(testBudget));
         when(budgetRepository.save(any(Budget.class))).thenReturn(testBudget);
 
-        // Act
         Budget result = budgetService.updateBudget(testBudget.getId(), testBudget);
 
-        // Assert
-        assertNotNull(result);
+        assertEquals(testBudget, result);
+        verify(budgetRepository).findById(testBudget.getId());
+        verify(budgetRepository).save(testBudget);
     }
 
     @Test
-    void deleteBudget_ShouldReturnVoid_WhenValidBudget() {
-        // Arrange
+    void updateBudget_ShouldThrowNotFound_WhenMissing() {
+        when(budgetRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(BudgetNotFoundException.class, () -> budgetService.updateBudget(99L, testBudget));
+        verify(budgetRepository, never()).save(any(Budget.class));
+    }
+
+    @Test
+    void deleteBudget_ShouldDelete_WhenExists() {
         when(budgetRepository.findById(testBudget.getId())).thenReturn(Optional.of(testBudget));
         doNothing().when(budgetRepository).delete(testBudget);
 
-        // Act
         budgetService.deleteBudget(testBudget.getId());
+
+        verify(budgetRepository).delete(testBudget);
+    }
+
+    @Test
+    void deleteBudget_ShouldThrowNotFound_WhenMissing() {
+        when(budgetRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(BudgetNotFoundException.class, () -> budgetService.deleteBudget(99L));
+        verify(budgetRepository, never()).delete(any(Budget.class));
     }
 }

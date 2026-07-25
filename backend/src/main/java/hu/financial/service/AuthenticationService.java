@@ -8,6 +8,7 @@ import hu.financial.dto.user.LoginUserDto;
 import hu.financial.dto.user.RegisterUserDto;
 import hu.financial.model.User;
 import hu.financial.repository.UserRepository;
+import hu.financial.exception.user.UserNotFoundException;
 import java.time.LocalDateTime;
 
 @Service
@@ -42,6 +43,9 @@ public class AuthenticationService {
         );
 
         User user = userRepository.findByEmail(input.getEmail());
+        if (user == null) {
+            throw new UserNotFoundException("User not found with email: " + input.getEmail());
+        }
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
         return user;

@@ -8,6 +8,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import hu.financial.repository.CategoryRepository;
 import hu.financial.model.Category;
 import hu.financial.model.User;
+import hu.financial.exception.category.CategoryNotFoundException;
+import hu.financial.exception.category.DuplicateCategoryException;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -40,103 +42,120 @@ public class CategoryServiceTest {
     testUser.setId(1L);
     testCategory = new Category("testcategory", "testdescription", testUser);
     testCategory.setId(1L);
-
     testCategoryDto = new CreateCategoryDto("testcategory", "testdescription");
   }
 
   @Test
-  void createCategory_ShouldReturnCategory_WhenValidCategory() {
-
-    // Arrange
+  void createCategory_ShouldReturnSaved_WhenNameUnique() {
+    when(categoryRepository.findByName(testCategory.getName())).thenReturn(null);
     when(categoryRepository.save(any(Category.class))).thenReturn(testCategory);
 
-    // Act
     Category result = categoryService.createCategory(testCategory);
 
-    // Assert
-    assertNotNull(result);
+    assertEquals(testCategory, result);
+    verify(categoryRepository).save(testCategory);
   }
 
   @Test
-  void getCategoryById_ShouldReturnCategory_WhenValidCategory() {
-    // Arrange
+  void createCategory_ShouldThrowDuplicate_WhenNameExists() {
+    when(categoryRepository.findByName(testCategory.getName())).thenReturn(testCategory);
+
+    assertThrows(DuplicateCategoryException.class, () -> categoryService.createCategory(testCategory));
+    verify(categoryRepository, never()).save(any(Category.class));
+  }
+
+  @Test
+  void getCategoryById_ShouldReturnCategory_WhenExists() {
     when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
 
-    // Act
     Category result = categoryService.getCategoryById(testCategory.getId());
 
-    // Assert
-    assertNotNull(result);
+    assertEquals(testCategory, result);
+    verify(categoryRepository).findById(testCategory.getId());
   }
 
   @Test
-  void updateCategory_ShouldReturnCategory_WhenValidCategory() {
-    // Arrange
+  void getCategoryById_ShouldThrowNotFound_WhenMissing() {
+    when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
+
+    assertThrows(CategoryNotFoundException.class, () -> categoryService.getCategoryById(99L));
+  }
+
+  @Test
+  void updateCategory_ShouldReturnUpdated_WhenExists() {
     when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
     when(categoryRepository.save(any(Category.class))).thenReturn(testCategory);
 
-    // Act
     Category result = categoryService.updateCategory(testCategory);
 
-    // Assert
-    assertNotNull(result);
+    assertEquals(testCategory, result);
+    verify(categoryRepository).findById(testCategory.getId());
+    verify(categoryRepository).save(testCategory);
   }
 
   @Test
-  void deleteCategory_ShouldReturnVoid_WhenValidCategory() {
-    // Arrange
+  void updateCategory_ShouldThrowNotFound_WhenMissing() {
+    when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.empty());
+
+    assertThrows(CategoryNotFoundException.class, () -> categoryService.updateCategory(testCategory));
+    verify(categoryRepository, never()).save(any(Category.class));
+  }
+
+  @Test
+  void deleteCategory_ShouldDelete_WhenExists() {
     when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
     doNothing().when(categoryRepository).deleteById(testCategory.getId());
 
-    // Act
     categoryService.deleteCategory(testCategory.getId());
+
+    verify(categoryRepository).deleteById(testCategory.getId());
   }
 
   @Test
-  void getAllCategories_ShouldReturnListOfCategories_WhenCategoriesExist() {
-    // Arrange
+  void deleteCategory_ShouldThrowNotFound_WhenMissing() {
+    when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
+
+    assertThrows(CategoryNotFoundException.class, () -> categoryService.deleteCategory(99L));
+    verify(categoryRepository, never()).deleteById(any());
+  }
+
+  @Test
+  void getAllCategories_ShouldReturnList_WhenCategoriesExist() {
     when(categoryRepository.findAll()).thenReturn(Arrays.asList(testCategory));
 
-    // Act
     List<Category> result = categoryService.getAllCategories();
 
-    // Assert
-    assertNotNull(result);
+    assertEquals(Arrays.asList(testCategory), result);
+    verify(categoryRepository, atLeastOnce()).findAll();
   }
 
   @Test
-  void mapToDto_ShouldReturnCategoryResponseDto_WhenValidCategory() {
-
-    // Act
-    CategoryResponseDto result = categoryService.mapToDto(testCategory);
-
-    // Assert
-    assertNotNull(result);
-  }
-
-  @Test
-  void mapToEntity_ShouldReturnCategory_WhenValidCategory() {
-
-    // Act
-    Category result = categoryService.mapToEntity(testCategoryDto);
-    result.setUser(testUser);
-
-    // Assert
-    assertNotNull(result);
-    assertEquals(testCategory.getName(), result.getName());
-    assertEquals(testCategory.getDescription(), result.getDescription());
-    assertEquals(testUser.getUsername(), result.getUser().getUsername());
-  }
-
-  @Test
-  void getCategoriesByUserId_ShouldReturnListOfCategories_WhenCategoriesExist() {
-    // Arrange
+  void getCategoriesByUserId_ShouldReturnList_WhenCategoriesExist() {
     when(categoryRepository.findByUserId(testUser.getId())).thenReturn(Arrays.asList(testCategory));
 
-    // Act
     List<Category> result = categoryService.getCategoriesByUserId(testUser.getId());
 
-    // Assert
-    assertNotNull(result);
+    assertEquals(Arrays.asList(testCategory), result);
+    verify(categoryRepository).findByUserId(testUser.getId());
+  }
+
+  @Test
+  void mapToDto_ShouldMapAllFields() {
+    CategoryResponseDto result = categoryService.mapToDto(testCategory);
+
+    assertEquals(testCategory.getId(), result.getId());
+    assertEquals(testCategory.getName(), result.getName());
+    assertEquals(testCategory.getDescription(), result.getDescription());
+  }
+
+  @Test
+  void mapToEntity_ShouldMapFields_AndSetCurrentUser() {
+    when(userService.getCurrentUser()).thenReturn(testUser);
+
+    Category result = categoryService.mapToEntity(testCategoryDto);
+
+    assertEquals(testCategoryDto.getName(), result.getName());
+    assertEquals(testCategoryDto.getDescription(), result.getDescription());
+    assertEquals(testUser, result.getUser());
   }
 }

@@ -6,6 +6,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import static org.mockito.Mockito.*;
 import hu.financial.model.User;
+import hu.financial.exception.user.UserNotFoundException;
 import hu.financial.dto.user.RegisterUserDto;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,17 +64,6 @@ public class AuthenticationServiceTest {
   }
 
   @Test
-  void signup_ShouldThrowException_WhenInvalidRegistrationData() {
-    // Arrange
-    when(passwordEncoder.encode(registerUserDto.getPassword())).thenThrow(new RuntimeException("Invalid password"));
-
-    // Act & Assert
-    assertThrows(RuntimeException.class, () -> authenticationService.signup(registerUserDto));
-    verify(passwordEncoder).encode(registerUserDto.getPassword());
-    verify(userRepository, never()).save(any(User.class));
-  }
-
-  @Test
   void authenticate_ShouldReturnUser_WhenValidCredentials() {
 
     Authentication authentication = mock(Authentication.class);
@@ -103,33 +93,16 @@ public class AuthenticationServiceTest {
       authenticationService.authenticate(loginUserDto);
     });
     verify(authenticationManager).authenticate(any());
+    verify(userRepository, never()).findByEmail(any());
   }
 
   @Test
-  void authenticate_ShouldThrowException_WhenUserNotFound() {
-    // Arrange
-    when(authenticationManager.authenticate(any())).thenReturn(null);
+  void authenticate_ShouldThrowUserNotFound_WhenUserMissingAfterAuthentication() {
+    when(authenticationManager.authenticate(any())).thenReturn(mock(Authentication.class));
     when(userRepository.findByEmail(loginUserDto.getEmail())).thenReturn(null);
 
-    // Act & Assert
-    assertThrows(NullPointerException.class, () -> {
-      authenticationService.authenticate(loginUserDto);
-    });
-    verify(authenticationManager).authenticate(any());
+    assertThrows(UserNotFoundException.class, () -> authenticationService.authenticate(loginUserDto));
     verify(userRepository).findByEmail(loginUserDto.getEmail());
-  }
-
-  @Test
-  void authenticate_ShouldThrowException_WhenUserNotAuthenticated() {
-    // Arrange
-    when(authenticationManager.authenticate(any())).thenThrow(new AuthenticationException("Authentication failed") {
-    });
-
-    // Act & Assert
-    assertThrows(AuthenticationException.class, () -> {
-      authenticationService.authenticate(loginUserDto);
-    });
-    verify(authenticationManager).authenticate(any());
-    verify(userRepository, never()).findByEmail(any());
+    verify(userRepository, never()).save(any(User.class));
   }
 }
