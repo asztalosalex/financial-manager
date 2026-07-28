@@ -15,8 +15,4 @@ public class UserResponseDto {
   private LocalDateTime createdAt;
   private LocalDateTime lastLogin;
 
-  public UserResponseDto(Long expiresIn, String message) {
-
-  }
-
 }

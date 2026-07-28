@@ -7,7 +7,6 @@ import hu.financial.service.UserService;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import hu.financial.model.User;
-import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -38,20 +37,14 @@ public class UserController {
     this.jwtService = jwtService;
   }
 
-  @Operation(summary = "Get all users")
-  @GetMapping
-  public ResponseEntity<List<User>> getAllUsers() {
-    List<User> users = userService.getAllUsers();
-    if (users.isEmpty()) {
-      return ResponseEntity.noContent().build();
-    }
-    return ResponseEntity.ok(users);
-  }
-
   @Operation(summary = "Get a user by id")
   @GetMapping("/{id}")
-  public ResponseEntity<GetUserByIdDto> getUserById(@PathVariable Long id) {
+  public ResponseEntity<GetUserByIdDto> getUserById(@PathVariable Long id, Authentication authentication) {
     try {
+      User currentUser = (User) authentication.getPrincipal();
+      if (!currentUser.getId().equals(id)) {
+        throw new UserNotFoundException(id);
+      }
       return ResponseEntity.ok(userService.getUserByIdDto(id));
     } catch (UserNotFoundException e) {
       return ResponseEntity.status(404).build();

@@ -9,8 +9,10 @@ import hu.financial.repository.BudgetRepository;
 import hu.financial.model.Budget;
 import hu.financial.model.User;
 import hu.financial.model.Category;
+import hu.financial.dto.budget.CreateBudgetDto;
 import hu.financial.exception.budget.BudgetNotFoundException;
 import hu.financial.exception.budget.BudgetValidationException;
+import hu.financial.exception.category.CategoryNotFoundException;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -25,6 +27,12 @@ public class BudgetServiceTest {
 
     @Mock
     private BudgetRepository budgetRepository;
+
+    @Mock
+    private CategoryService categoryService;
+
+    @Mock
+    private UserService userService;
 
     @InjectMocks
     private BudgetService budgetService;
@@ -133,5 +141,28 @@ public class BudgetServiceTest {
 
         assertThrows(BudgetNotFoundException.class, () -> budgetService.deleteBudget(99L));
         verify(budgetRepository, never()).delete(any(Budget.class));
+    }
+
+    @Test
+    void mapToEntity_ShouldUseOwnedCategory_AndCurrentUser() {
+        CreateBudgetDto dto = new CreateBudgetDto(100.0, LocalDate.now(), testCategory.getId());
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId())).thenReturn(testCategory);
+
+        Budget result = budgetService.mapToEntity(dto);
+
+        assertEquals(testCategory, result.getCategory());
+        assertEquals(testUser, result.getUser());
+        verify(categoryService).getOwnedCategoryById(testCategory.getId(), testUser.getId());
+    }
+
+    @Test
+    void mapToEntity_ShouldPropagateNotFound_WhenCategoryOwnedBySomeoneElse() {
+        CreateBudgetDto dto = new CreateBudgetDto(100.0, LocalDate.now(), testCategory.getId());
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId()))
+                .thenThrow(new CategoryNotFoundException(testCategory.getId()));
+
+        assertThrows(CategoryNotFoundException.class, () -> budgetService.mapToEntity(dto));
     }
 }

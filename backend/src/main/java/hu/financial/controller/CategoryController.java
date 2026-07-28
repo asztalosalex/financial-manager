@@ -21,7 +21,6 @@ import hu.financial.dto.category.CreateCategoryDto;
 import hu.financial.dto.category.CategoryResponseDto;
 import java.util.stream.Collectors;
 import hu.financial.service.UserService;
-import hu.financial.exception.category.CategoryNotFoundException;
 
 @RestController
 @RequestMapping("/api/categories")
@@ -56,13 +55,8 @@ public class CategoryController {
     @PutMapping("/{id}")
     public ResponseEntity<CategoryResponseDto> updateCategory(@PathVariable Long id, @Valid @RequestBody CreateCategoryDto dto) {
         Long currentUserId = userService.getCurrentUser().getId();
-        Category existingCategory = categoryService.getCategoryById(id);
-        
-        // Validate ownership
-        if (!existingCategory.getUser().getId().equals(currentUserId)) {
-            throw new CategoryNotFoundException("Category not found or you don't have permission to update it");
-        }
-        
+        Category existingCategory = categoryService.getOwnedCategoryById(id, currentUserId);
+
         existingCategory.setName(dto.getName());
         existingCategory.setDescription(dto.getDescription());
         Category updatedCategory = categoryService.updateCategory(existingCategory);

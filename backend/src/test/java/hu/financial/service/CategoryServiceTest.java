@@ -102,11 +102,11 @@ public class CategoryServiceTest {
   }
 
   @Test
-  void deleteCategory_ShouldDelete_WhenExists() {
+  void deleteCategory_ShouldDelete_WhenExistsAndOwnedByUser() {
     when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
     doNothing().when(categoryRepository).deleteById(testCategory.getId());
 
-    categoryService.deleteCategory(testCategory.getId());
+    categoryService.deleteCategory(testCategory.getId(), testUser.getId());
 
     verify(categoryRepository).deleteById(testCategory.getId());
   }
@@ -115,8 +115,41 @@ public class CategoryServiceTest {
   void deleteCategory_ShouldThrowNotFound_WhenMissing() {
     when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
 
-    assertThrows(CategoryNotFoundException.class, () -> categoryService.deleteCategory(99L));
+    assertThrows(CategoryNotFoundException.class, () -> categoryService.deleteCategory(99L, testUser.getId()));
     verify(categoryRepository, never()).deleteById(any());
+  }
+
+  @Test
+  void deleteCategory_ShouldThrowNotFound_WhenOwnedBySomeoneElse() {
+    when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
+
+    assertThrows(CategoryNotFoundException.class, () -> categoryService.deleteCategory(testCategory.getId(), 99L));
+    verify(categoryRepository, never()).deleteById(any());
+  }
+
+  @Test
+  void getOwnedCategoryById_ShouldReturnCategory_WhenOwnedByUser() {
+    when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
+
+    Category result = categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId());
+
+    assertEquals(testCategory, result);
+  }
+
+  @Test
+  void getOwnedCategoryById_ShouldThrowNotFound_WhenOwnedBySomeoneElse() {
+    when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
+
+    assertThrows(CategoryNotFoundException.class,
+        () -> categoryService.getOwnedCategoryById(testCategory.getId(), 99L));
+  }
+
+  @Test
+  void getOwnedCategoryById_ShouldThrowNotFound_WhenMissing() {
+    when(categoryRepository.findById(99L)).thenReturn(Optional.empty());
+
+    assertThrows(CategoryNotFoundException.class,
+        () -> categoryService.getOwnedCategoryById(99L, testUser.getId()));
   }
 
   @Test

@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import hu.financial.repository.BudgetRepository;
 import hu.financial.model.Budget;
+import hu.financial.model.User;
 import hu.financial.exception.budget.BudgetNotFoundException;
 import hu.financial.exception.budget.BudgetValidationException;
 import hu.financial.dto.budget.CreateBudgetDto;
@@ -68,11 +69,12 @@ public class BudgetService {
     }
 
     public Budget mapToEntity(CreateBudgetDto dto) {
+        User currentUser = userService.getCurrentUser();
         Budget budget = new Budget();
         budget.setAmount(dto.getAmount());
         budget.setMonth(dto.getMonth());
-        budget.setCategory(categoryService.getCategoryById(dto.getCategoryId()));
-        budget.setUser(userService.getCurrentUser());
+        budget.setCategory(categoryService.getOwnedCategoryById(dto.getCategoryId(), currentUser.getId()));
+        budget.setUser(currentUser);
         return budget;
     }
 

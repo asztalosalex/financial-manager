@@ -102,7 +102,7 @@ public class CategoryControllerTest {
     void updateCategory_ShouldReturnCategory_WhenValidCategory() {
         // Arrange
         when(userService.getCurrentUser()).thenReturn(testUser);
-        when(categoryService.getCategoryById(testCategory.getId())).thenReturn(testCategory);
+        when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId())).thenReturn(testCategory);
         when(categoryService.updateCategory(any(Category.class))).thenReturn(testCategory);
         when(categoryService.mapToDto(any(Category.class))).thenReturn(categoryResponseDto);
 
@@ -115,7 +115,7 @@ public class CategoryControllerTest {
         assertEquals(testCategory.getName(), response.getBody().getName());
         assertEquals(testCategory.getDescription(), response.getBody().getDescription());
 
-        verify(categoryService).getCategoryById(testCategory.getId());
+        verify(categoryService).getOwnedCategoryById(testCategory.getId(), testUser.getId());
         verify(categoryService).mapToDto(testCategory);
     }
 

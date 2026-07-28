@@ -8,6 +8,7 @@ import hu.financial.dto.user.LoginUserDto;
 import hu.financial.dto.user.RegisterUserDto;
 import hu.financial.model.User;
 import hu.financial.repository.UserRepository;
+import hu.financial.exception.user.DuplicateUserException;
 import hu.financial.exception.user.UserNotFoundException;
 import java.time.LocalDateTime;
 
@@ -29,6 +30,13 @@ public class AuthenticationService {
     }
 
     public User signup(RegisterUserDto input) {
+        if (userRepository.findByEmail(input.getEmail()) != null) {
+            throw new DuplicateUserException("email", input.getEmail());
+        }
+        if (userRepository.findByUsername(input.getUsername()) != null) {
+            throw new DuplicateUserException("username", input.getUsername());
+        }
+
         User user = new User();
         user.setUsername(input.getUsername());
         user.setEmail(input.getEmail());

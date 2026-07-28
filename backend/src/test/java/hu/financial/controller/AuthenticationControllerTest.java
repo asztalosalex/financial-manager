@@ -12,6 +12,8 @@ import org.springframework.security.core.AuthenticationException;
 
 import hu.financial.dto.user.LoginUserDto;
 import hu.financial.dto.user.RegisterUserDto;
+import hu.financial.dto.user.UserResponseDto;
+import hu.financial.mapper.UserMapper;
 import hu.financial.model.User;
 import hu.financial.responses.LoginResponse;
 import hu.financial.service.AuthenticationService;
@@ -31,6 +33,9 @@ public class AuthenticationControllerTest {
     @Mock
     private JwtService jwtService;
 
+    @Mock
+    private UserMapper userMapper;
+
     @InjectMocks
     private AuthenticationController authenticationController;
 
@@ -42,27 +47,30 @@ public class AuthenticationControllerTest {
     void setUp() {
         testUser = new User("testuser", "password123", "test@example.com", LocalDateTime.now());
         testUser.setId(1L);
-        
-        registerUserDto = new RegisterUserDto("testuser", "password123", "test@example.com", LocalDateTime.now());
+
+        registerUserDto = new RegisterUserDto("testuser", "password123", "test@example.com");
         loginUserDto = new LoginUserDto("test@example.com", "password123");
     }
 
     @Test
-    void signup_ShouldReturnUser_WhenValidRegistrationData() {
+    void signup_ShouldReturnUserResponseDto_WhenValidRegistrationData() {
         // Arrange
+        UserResponseDto responseDto = new UserResponseDto(
+                testUser.getId(), testUser.getUsername(), testUser.getEmail(), testUser.getCreatedAt(), null);
         when(authenticationService.signup(any(RegisterUserDto.class))).thenReturn(testUser);
+        when(userMapper.mapToDto(testUser)).thenReturn(responseDto);
 
         // Act
-        ResponseEntity<User> response = authenticationController.signup(registerUserDto);
+        ResponseEntity<UserResponseDto> response = authenticationController.signup(registerUserDto);
 
         // Assert
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        
+
         assertEquals(testUser.getUsername(), response.getBody().getUsername());
         assertEquals(testUser.getEmail(), response.getBody().getEmail());
-        
+
         verify(authenticationService, times(1)).signup(registerUserDto);
     }
 

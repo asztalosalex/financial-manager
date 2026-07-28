@@ -15,12 +15,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import org.springframework.security.core.Authentication;
 import hu.financial.dto.user.UpdateProfileDto;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,44 +41,52 @@ class UserControllerTest {
   private UserController userController;
 
   @Test
-  void getAllUsers_WithUsers_ReturnsUsers() {
-    // Arrange
-    List<User> users = Arrays.asList(
-        new User("user1", "pass1", "user1@example.com"),
-        new User("user2", "pass2", "user2@example.com"));
-    when(userService.getAllUsers()).thenReturn(users);
-
-    // Act
-    ResponseEntity<List<User>> response = userController.getAllUsers();
-
-    // Assert
-    assertEquals(HttpStatus.OK, response.getStatusCode());
-    assertEquals(users, response.getBody());
-  }
-
-  @Test
-  void getAllUsers_EmptyList_ReturnsNoContent() {
-    // Arrange
-    when(userService.getAllUsers()).thenReturn(Collections.emptyList());
-
-    // Act
-    ResponseEntity<List<User>> response = userController.getAllUsers();
-
-    // Assert
-    assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-    assertNull(response.getBody());
-  }
-
-  @Test
   void getUserById_UserNotFound_Returns404() {
     Long userId = 999L;
+    User currentUser = new User("testuser", "password", "test@example.com");
+    currentUser.setId(userId);
+    Authentication authentication = mock(Authentication.class);
+    when(authentication.getPrincipal()).thenReturn(currentUser);
 
     when(userService.getUserByIdDto(userId))
         .thenThrow(new UserNotFoundException(userId));
 
-    ResponseEntity<GetUserByIdDto> response = userController.getUserById(userId);
+    ResponseEntity<GetUserByIdDto> response = userController.getUserById(userId, authentication);
 
     assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+  }
+
+  @Test
+  void getUserById_ForeignId_Returns404_AndDoesNotExposeOtherUsersData() {
+    Long ownId = 1L;
+    Long foreignId = 2L;
+    User currentUser = new User("testuser", "password", "test@example.com");
+    currentUser.setId(ownId);
+    Authentication authentication = mock(Authentication.class);
+    when(authentication.getPrincipal()).thenReturn(currentUser);
+
+    ResponseEntity<GetUserByIdDto> response = userController.getUserById(foreignId, authentication);
+
+    assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    assertNull(response.getBody());
+    verify(userService, never()).getUserByIdDto(any());
+  }
+
+  @Test
+  void getUserById_OwnId_ReturnsOwnData() {
+    Long ownId = 1L;
+    User currentUser = new User("testuser", "password", "test@example.com");
+    currentUser.setId(ownId);
+    Authentication authentication = mock(Authentication.class);
+    when(authentication.getPrincipal()).thenReturn(currentUser);
+
+    GetUserByIdDto expectedDto = new GetUserByIdDto(ownId, "testuser", java.util.Collections.emptyList());
+    when(userService.getUserByIdDto(ownId)).thenReturn(expectedDto);
+
+    ResponseEntity<GetUserByIdDto> response = userController.getUserById(ownId, authentication);
+
+    assertEquals(HttpStatus.OK, response.getStatusCode());
+    assertEquals(expectedDto, response.getBody());
   }
 
   @Test

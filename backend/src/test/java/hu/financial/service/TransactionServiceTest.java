@@ -9,6 +9,7 @@ import hu.financial.repository.TransactionRepository;
 import hu.financial.model.Transaction;
 import hu.financial.model.User;
 import hu.financial.model.Category;
+import hu.financial.dto.transaction.CreateTransactionDto;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -18,6 +19,7 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.time.LocalDate;
 import hu.financial.model.enums.TransactionType;
+import hu.financial.exception.category.CategoryNotFoundException;
 import hu.financial.exception.transaction.TransactionNotFoundException;
 import hu.financial.exception.transaction.TransactionValidationException;
 
@@ -26,6 +28,12 @@ public class TransactionServiceTest {
 
     @Mock
     private TransactionRepository transactionRepository;
+
+    @Mock
+    private CategoryService categoryService;
+
+    @Mock
+    private UserService userService;
 
     @InjectMocks
     private TransactionService transactionService;
@@ -160,5 +168,30 @@ public class TransactionServiceTest {
 
         assertThrows(TransactionNotFoundException.class, () -> transactionService.deleteTransaction(99L));
         verify(transactionRepository, never()).delete(any(Transaction.class));
+    }
+
+    @Test
+    void mapToEntity_ShouldUseOwnedCategory_AndCurrentUser() {
+        CreateTransactionDto dto = new CreateTransactionDto(
+                testTransactionType, "testdescription", testCategory.getId(), 100.0, LocalDate.now());
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId())).thenReturn(testCategory);
+
+        Transaction result = transactionService.mapToEntity(dto);
+
+        assertEquals(testCategory, result.getCategory());
+        assertEquals(testUser, result.getUser());
+        verify(categoryService).getOwnedCategoryById(testCategory.getId(), testUser.getId());
+    }
+
+    @Test
+    void mapToEntity_ShouldPropagateNotFound_WhenCategoryOwnedBySomeoneElse() {
+        CreateTransactionDto dto = new CreateTransactionDto(
+                testTransactionType, "testdescription", testCategory.getId(), 100.0, LocalDate.now());
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId()))
+                .thenThrow(new CategoryNotFoundException(testCategory.getId()));
+
+        assertThrows(CategoryNotFoundException.class, () -> transactionService.mapToEntity(dto));
     }
 }

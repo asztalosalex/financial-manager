@@ -6,6 +6,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import static org.mockito.Mockito.*;
 import hu.financial.model.User;
+import hu.financial.exception.user.DuplicateUserException;
 import hu.financial.exception.user.UserNotFoundException;
 import hu.financial.dto.user.RegisterUserDto;
 import org.junit.jupiter.api.Test;
@@ -43,13 +44,15 @@ public class AuthenticationServiceTest {
   void setUp() {
     testUser = new User("testuser", "password123", "test@example.com", LocalDateTime.now());
     testUser.setId(1L);
-    registerUserDto = new RegisterUserDto("testuser", "password123", "test@example.com", LocalDateTime.now());
+    registerUserDto = new RegisterUserDto("testuser", "password123", "test@example.com");
     loginUserDto = new LoginUserDto("test@example.com", "password123");
   }
 
   @Test
   void signup_ShouldReturnUser_WhenValidRegistrationData() {
     // Arrange
+    when(userRepository.findByEmail(registerUserDto.getEmail())).thenReturn(null);
+    when(userRepository.findByUsername(registerUserDto.getUsername())).thenReturn(null);
     when(passwordEncoder.encode(registerUserDto.getPassword())).thenReturn("encodedPassword");
     when(userRepository.save(any(User.class))).thenReturn(testUser);
 
@@ -61,6 +64,23 @@ public class AuthenticationServiceTest {
     assertEquals(testUser, result);
     verify(passwordEncoder).encode(registerUserDto.getPassword());
     verify(userRepository).save(any(User.class));
+  }
+
+  @Test
+  void signup_ShouldThrowDuplicateUser_WhenEmailAlreadyRegistered() {
+    when(userRepository.findByEmail(registerUserDto.getEmail())).thenReturn(testUser);
+
+    assertThrows(DuplicateUserException.class, () -> authenticationService.signup(registerUserDto));
+    verify(userRepository, never()).save(any(User.class));
+  }
+
+  @Test
+  void signup_ShouldThrowDuplicateUser_WhenUsernameAlreadyRegistered() {
+    when(userRepository.findByEmail(registerUserDto.getEmail())).thenReturn(null);
+    when(userRepository.findByUsername(registerUserDto.getUsername())).thenReturn(testUser);
+
+    assertThrows(DuplicateUserException.class, () -> authenticationService.signup(registerUserDto));
+    verify(userRepository, never()).save(any(User.class));
   }
 
   @Test

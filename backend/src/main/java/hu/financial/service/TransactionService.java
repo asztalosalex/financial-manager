@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import hu.financial.repository.TransactionRepository;
 import hu.financial.model.Transaction;
+import hu.financial.model.User;
 import hu.financial.exception.transaction.TransactionNotFoundException;
 import hu.financial.exception.transaction.TransactionValidationException;
 import hu.financial.dto.transaction.CreateTransactionDto;
@@ -72,13 +73,14 @@ public class TransactionService {
   }
 
   public Transaction mapToEntity(CreateTransactionDto dto) {
+    User currentUser = userService.getCurrentUser();
     Transaction transaction = new Transaction();
     transaction.setType(dto.getType());
     transaction.setDescription(dto.getDescription());
     transaction.setAmount(dto.getAmount());
     transaction.setDate(dto.getDate());
-    transaction.setCategory(categoryService.getCategoryById(dto.getCategoryId()));
-    transaction.setUser(userService.getCurrentUser());
+    transaction.setCategory(categoryService.getOwnedCategoryById(dto.getCategoryId(), currentUser.getId()));
+    transaction.setUser(currentUser);
     return transaction;
   }
 

@@ -18,7 +18,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -33,14 +32,6 @@ public class UserService implements UserDetailsService {
     @Autowired
     private UserMapper userMapper;
   
-    
-    public List<User> getAllUsers() {
-        List<User> users = userRepository.findAll();
-        if (users.isEmpty()) {
-            throw new UserNotFoundException("No users found");
-        }
-        return users;
-    }
 
     public long countUsers(){
         return userRepository.count();
