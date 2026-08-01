@@ -24,6 +24,7 @@ import static org.mockito.Mockito.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
@@ -55,13 +56,13 @@ public class TransactionControllerTest {
         testCategory.setId(1L);
 
         testTransaction = new Transaction(1L, TransactionType.INCOME, "testdescription",
-                testCategory, testUser, 100.0, LocalDate.now());
+                testCategory, testUser, new BigDecimal("100.00"), LocalDate.now());
 
         createTransactionDto = new CreateTransactionDto(TransactionType.INCOME, "testdescription",
-                testCategory.getId(), 100.0, LocalDate.now());
+                testCategory.getId(), new BigDecimal("100.00"), LocalDate.now());
 
         transactionResponseDto = new TransactionResponseDto(testTransaction.getId(), TransactionType.INCOME,
-                "testdescription", testCategory.getId(), testCategory.getName(), 100.0, testTransaction.getDate());
+                "testdescription", testCategory.getId(), testCategory.getName(), new BigDecimal("100.00"), testTransaction.getDate());
     }
 
     @Test
@@ -123,7 +124,7 @@ public class TransactionControllerTest {
         User otherUser = new User("other", "password123", "other@example.com");
         otherUser.setId(2L);
         Transaction foreignTransaction = new Transaction(5L, TransactionType.EXPENSE, "foreign",
-                testCategory, otherUser, 50.0, LocalDate.now());
+                testCategory, otherUser, new BigDecimal("50.00"), LocalDate.now());
 
         when(userService.getCurrentUser()).thenReturn(testUser);
         when(transactionService.getTransactionById(foreignTransaction.getId())).thenReturn(foreignTransaction);
@@ -153,7 +154,7 @@ public class TransactionControllerTest {
         User otherUser = new User("other", "password123", "other@example.com");
         otherUser.setId(2L);
         Transaction foreignTransaction = new Transaction(5L, TransactionType.EXPENSE, "foreign",
-                testCategory, otherUser, 50.0, LocalDate.now());
+                testCategory, otherUser, new BigDecimal("50.00"), LocalDate.now());
 
         when(userService.getCurrentUser()).thenReturn(testUser);
         when(transactionService.getTransactionById(foreignTransaction.getId())).thenReturn(foreignTransaction);
@@ -180,7 +181,7 @@ public class TransactionControllerTest {
         User otherUser = new User("other", "password123", "other@example.com");
         otherUser.setId(2L);
         Transaction foreignTransaction = new Transaction(5L, TransactionType.EXPENSE, "foreign",
-                testCategory, otherUser, 50.0, LocalDate.now());
+                testCategory, otherUser, new BigDecimal("50.00"), LocalDate.now());
 
         when(userService.getCurrentUser()).thenReturn(testUser);
         when(transactionService.getTransactionById(foreignTransaction.getId())).thenReturn(foreignTransaction);

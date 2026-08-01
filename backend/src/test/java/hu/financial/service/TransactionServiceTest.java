@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import org.junit.jupiter.api.BeforeEach;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Arrays;
 import java.util.Optional;
@@ -49,7 +50,7 @@ public class TransactionServiceTest {
         testCategory = new Category("testcategory", "testdescription", testUser);
         testCategory.setId(1L);
         testTransactionType = TransactionType.INCOME;
-        testTransaction = new Transaction(1L, testTransactionType, "testdescription", testCategory, testUser, 100.0, LocalDate.now());
+        testTransaction = new Transaction(1L, testTransactionType, "testdescription", testCategory, testUser, new BigDecimal("100.00"), LocalDate.now());
     }
 
 
@@ -141,7 +142,7 @@ public class TransactionServiceTest {
     @Test
     void createTransaction_ShouldThrowValidation_WhenAmountNotPositive() {
         Transaction invalid = new Transaction(2L, testTransactionType, "invalid",
-                testCategory, testUser, 0.0, LocalDate.now());
+                testCategory, testUser, BigDecimal.ZERO, LocalDate.now());
 
         assertThrows(TransactionValidationException.class, () -> transactionService.createTransaction(invalid));
         verify(transactionRepository, never()).save(any(Transaction.class));
@@ -173,7 +174,7 @@ public class TransactionServiceTest {
     @Test
     void mapToEntity_ShouldUseOwnedCategory_AndCurrentUser() {
         CreateTransactionDto dto = new CreateTransactionDto(
-                testTransactionType, "testdescription", testCategory.getId(), 100.0, LocalDate.now());
+                testTransactionType, "testdescription", testCategory.getId(), new BigDecimal("100.00"), LocalDate.now());
         when(userService.getCurrentUser()).thenReturn(testUser);
         when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId())).thenReturn(testCategory);
 
@@ -187,11 +188,24 @@ public class TransactionServiceTest {
     @Test
     void mapToEntity_ShouldPropagateNotFound_WhenCategoryOwnedBySomeoneElse() {
         CreateTransactionDto dto = new CreateTransactionDto(
-                testTransactionType, "testdescription", testCategory.getId(), 100.0, LocalDate.now());
+                testTransactionType, "testdescription", testCategory.getId(), new BigDecimal("100.00"), LocalDate.now());
         when(userService.getCurrentUser()).thenReturn(testUser);
         when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId()))
                 .thenThrow(new CategoryNotFoundException(testCategory.getId()));
 
         assertThrows(CategoryNotFoundException.class, () -> transactionService.mapToEntity(dto));
+    }
+
+    @Test
+    void mapToEntity_ShouldNormalizeAmountToTwoDecimals_WhenAmountHasFewerDecimals() {
+        CreateTransactionDto dto = new CreateTransactionDto(
+                testTransactionType, "testdescription", testCategory.getId(), new BigDecimal("100"), LocalDate.now());
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId())).thenReturn(testCategory);
+
+        Transaction result = transactionService.mapToEntity(dto);
+
+        assertEquals(new BigDecimal("100.00"), result.getAmount());
+        assertEquals(2, result.getAmount().scale());
     }
 }

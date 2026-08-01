@@ -2,16 +2,13 @@ package hu.financial.repository;
 
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import hu.financial.model.Transaction;
-import hu.financial.model.User;
 
+@Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
-    
-    Transaction findByUser(User user);
-
-    Transaction findByUserAndId(User user, Long id);
 
     List<Transaction> findByUserId(Long userId);
-    
+
 }

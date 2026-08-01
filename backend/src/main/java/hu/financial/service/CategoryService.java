@@ -3,6 +3,7 @@ package hu.financial.service;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import hu.financial.repository.CategoryRepository;
 import hu.financial.model.Category;
 import hu.financial.exception.category.DuplicateCategoryException;
@@ -12,13 +13,14 @@ import hu.financial.dto.category.CreateCategoryDto;
 
 @Service
 public class CategoryService {
-    
+
     @Autowired
     private CategoryRepository categoryRepository;
 
     @Autowired
     private UserService userService;
-    
+
+    @Transactional
     public Category createCategory(Category category) {
         validateCategoryForCreation(category);
         return categoryRepository.save(category);
@@ -37,6 +39,7 @@ public class CategoryService {
         return category;
     }
 
+    @Transactional
     public Category updateCategory(Category category) {
         Category existingCategory = categoryRepository.findById(category.getId())
                 .orElseThrow(() -> new CategoryNotFoundException(category.getId()));
@@ -46,6 +49,7 @@ public class CategoryService {
         return categoryRepository.save(existingCategory);
     }
 
+    @Transactional
     public void deleteCategory(Long id, Long userId) {
         Category existingCategory = categoryRepository.findById(id).orElse(null);
         if (existingCategory == null) {
@@ -67,14 +71,14 @@ public class CategoryService {
     }
 
     private void validateCategoryForCreation(Category category) {
-        if (categoryRepository.findByName(category.getName()) != null) {
+        if (categoryRepository.findByUserAndName(category.getUser(), category.getName()) != null) {
             throw new DuplicateCategoryException("name", category.getName());
         }
     }
 
     private void validateCategoryForUpdate(Category existingCategory, Category category) {
         if (!existingCategory.getName().equals(category.getName())) {
-            if (categoryRepository.findByName(category.getName()) != null) {
+            if (categoryRepository.findByUserAndName(existingCategory.getUser(), category.getName()) != null) {
                 throw new DuplicateCategoryException("name", category.getName());
             }
         }

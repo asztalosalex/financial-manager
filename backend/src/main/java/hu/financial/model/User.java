@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Column;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import org.springframework.security.core.userdetails.UserDetails;
 import java.time.LocalDateTime;
@@ -32,9 +33,10 @@ public class User implements UserDetails {
   private String username;
 
   @Column(nullable = false)
+  @JsonIgnore
   private String password;
 
-  @Column()
+  @Column(nullable = false, unique = true)
   private String email;
 
   @Column(nullable = true)

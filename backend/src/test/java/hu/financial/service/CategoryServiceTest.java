@@ -47,7 +47,7 @@ public class CategoryServiceTest {
 
   @Test
   void createCategory_ShouldReturnSaved_WhenNameUnique() {
-    when(categoryRepository.findByName(testCategory.getName())).thenReturn(null);
+    when(categoryRepository.findByUserAndName(testCategory.getUser(), testCategory.getName())).thenReturn(null);
     when(categoryRepository.save(any(Category.class))).thenReturn(testCategory);
 
     Category result = categoryService.createCategory(testCategory);
@@ -58,7 +58,7 @@ public class CategoryServiceTest {
 
   @Test
   void createCategory_ShouldThrowDuplicate_WhenNameExists() {
-    when(categoryRepository.findByName(testCategory.getName())).thenReturn(testCategory);
+    when(categoryRepository.findByUserAndName(testCategory.getUser(), testCategory.getName())).thenReturn(testCategory);
 
     assertThrows(DuplicateCategoryException.class, () -> categoryService.createCategory(testCategory));
     verify(categoryRepository, never()).save(any(Category.class));
@@ -91,6 +91,19 @@ public class CategoryServiceTest {
     assertEquals(testCategory, result);
     verify(categoryRepository).findById(testCategory.getId());
     verify(categoryRepository).save(testCategory);
+  }
+
+  @Test
+  void updateCategory_ShouldThrowDuplicate_WhenRenamedToNameAlreadyUsedByCurrentUser() {
+    Category renamed = new Category("newname", "testdescription", testUser);
+    renamed.setId(testCategory.getId());
+    Category colliding = new Category("newname", "other", testUser);
+
+    when(categoryRepository.findById(testCategory.getId())).thenReturn(Optional.of(testCategory));
+    when(categoryRepository.findByUserAndName(testUser, "newname")).thenReturn(colliding);
+
+    assertThrows(DuplicateCategoryException.class, () -> categoryService.updateCategory(renamed));
+    verify(categoryRepository, never()).save(any(Category.class));
   }
 
   @Test

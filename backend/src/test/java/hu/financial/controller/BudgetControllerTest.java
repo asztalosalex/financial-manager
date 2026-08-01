@@ -23,6 +23,7 @@ import static org.mockito.Mockito.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
@@ -53,11 +54,11 @@ public class BudgetControllerTest {
         testCategory = new Category("testcategory", "testdescription", testUser);
         testCategory.setId(1L);
 
-        testBudget = new Budget(1L, 100.0, LocalDate.now(), testUser, testCategory);
+        testBudget = new Budget(1L, new BigDecimal("100.00"), LocalDate.now(), testUser, testCategory);
 
-        createBudgetDto = new CreateBudgetDto(100.0, LocalDate.now(), testCategory.getId());
+        createBudgetDto = new CreateBudgetDto(new BigDecimal("100.00"), LocalDate.now(), testCategory.getId());
 
-        budgetResponseDto = new BudgetResponseDto(testBudget.getId(), 100.0, testBudget.getMonth(),
+        budgetResponseDto = new BudgetResponseDto(testBudget.getId(), new BigDecimal("100.00"), testBudget.getMonth(),
                 testCategory.getId(), testCategory.getName());
     }
 
@@ -119,7 +120,7 @@ public class BudgetControllerTest {
     void getBudgetById_ShouldThrowNotFound_WhenOwnedByAnotherUser() {
         User otherUser = new User("other", "password123", "other@example.com");
         otherUser.setId(2L);
-        Budget foreignBudget = new Budget(5L, 50.0, LocalDate.now(), otherUser, testCategory);
+        Budget foreignBudget = new Budget(5L, new BigDecimal("50.00"), LocalDate.now(), otherUser, testCategory);
 
         when(userService.getCurrentUser()).thenReturn(testUser);
         when(budgetService.getBudgetById(foreignBudget.getId())).thenReturn(foreignBudget);
@@ -148,7 +149,7 @@ public class BudgetControllerTest {
     void updateBudget_ShouldThrowNotFound_WhenOwnedByAnotherUser() {
         User otherUser = new User("other", "password123", "other@example.com");
         otherUser.setId(2L);
-        Budget foreignBudget = new Budget(5L, 50.0, LocalDate.now(), otherUser, testCategory);
+        Budget foreignBudget = new Budget(5L, new BigDecimal("50.00"), LocalDate.now(), otherUser, testCategory);
 
         when(userService.getCurrentUser()).thenReturn(testUser);
         when(budgetService.getBudgetById(foreignBudget.getId())).thenReturn(foreignBudget);
@@ -174,7 +175,7 @@ public class BudgetControllerTest {
     void deleteBudget_ShouldThrowNotFound_WhenOwnedByAnotherUser() {
         User otherUser = new User("other", "password123", "other@example.com");
         otherUser.setId(2L);
-        Budget foreignBudget = new Budget(5L, 50.0, LocalDate.now(), otherUser, testCategory);
+        Budget foreignBudget = new Budget(5L, new BigDecimal("50.00"), LocalDate.now(), otherUser, testCategory);
 
         when(userService.getCurrentUser()).thenReturn(testUser);
         when(budgetService.getBudgetById(foreignBudget.getId())).thenReturn(foreignBudget);

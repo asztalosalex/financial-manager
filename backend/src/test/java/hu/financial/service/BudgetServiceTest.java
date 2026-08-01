@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import org.junit.jupiter.api.BeforeEach;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Arrays;
@@ -47,7 +48,7 @@ public class BudgetServiceTest {
         testUser.setId(1L);
         testCategory = new Category("testcategory", "testdescription", testUser);
         testCategory.setId(1L);
-        testBudget = new Budget(1L, 100.0, LocalDate.now(), testUser, testCategory);
+        testBudget = new Budget(1L, new BigDecimal("100.00"), LocalDate.now(), testUser, testCategory);
     }
 
     @Test
@@ -62,7 +63,7 @@ public class BudgetServiceTest {
 
     @Test
     void createBudget_ShouldThrowValidation_WhenAmountNotPositive() {
-        Budget invalid = new Budget(2L, 0.0, LocalDate.now(), testUser, testCategory);
+        Budget invalid = new Budget(2L, BigDecimal.ZERO, LocalDate.now(), testUser, testCategory);
 
         assertThrows(BudgetValidationException.class, () -> budgetService.createBudget(invalid));
         verify(budgetRepository, never()).save(any(Budget.class));
@@ -145,7 +146,7 @@ public class BudgetServiceTest {
 
     @Test
     void mapToEntity_ShouldUseOwnedCategory_AndCurrentUser() {
-        CreateBudgetDto dto = new CreateBudgetDto(100.0, LocalDate.now(), testCategory.getId());
+        CreateBudgetDto dto = new CreateBudgetDto(new BigDecimal("100.00"), LocalDate.now(), testCategory.getId());
         when(userService.getCurrentUser()).thenReturn(testUser);
         when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId())).thenReturn(testCategory);
 
@@ -158,11 +159,23 @@ public class BudgetServiceTest {
 
     @Test
     void mapToEntity_ShouldPropagateNotFound_WhenCategoryOwnedBySomeoneElse() {
-        CreateBudgetDto dto = new CreateBudgetDto(100.0, LocalDate.now(), testCategory.getId());
+        CreateBudgetDto dto = new CreateBudgetDto(new BigDecimal("100.00"), LocalDate.now(), testCategory.getId());
         when(userService.getCurrentUser()).thenReturn(testUser);
         when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId()))
                 .thenThrow(new CategoryNotFoundException(testCategory.getId()));
 
         assertThrows(CategoryNotFoundException.class, () -> budgetService.mapToEntity(dto));
+    }
+
+    @Test
+    void mapToEntity_ShouldNormalizeAmountToTwoDecimals_WhenAmountHasFewerDecimals() {
+        CreateBudgetDto dto = new CreateBudgetDto(new BigDecimal("100"), LocalDate.now(), testCategory.getId());
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId())).thenReturn(testCategory);
+
+        Budget result = budgetService.mapToEntity(dto);
+
+        assertEquals(new BigDecimal("100.00"), result.getAmount());
+        assertEquals(2, result.getAmount().scale());
     }
 }

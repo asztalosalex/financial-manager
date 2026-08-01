@@ -1,12 +1,14 @@
 package hu.financial.dto.transaction;
 
 import hu.financial.model.enums.TransactionType;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
@@ -23,8 +25,9 @@ public class CreateTransactionDto {
     private Long categoryId;
 
     @NotNull(message = "Transaction amount is required")
-    @Positive(message = "Transaction amount must be greater than 0")
-    private Double amount;
+    @DecimalMin(value = "0.0", inclusive = false, message = "Transaction amount must be greater than 0")
+    @Digits(integer = 17, fraction = 2, message = "Transaction amount must have at most 17 integer digits and 2 fraction digits")
+    private BigDecimal amount;
 
     @NotNull(message = "Transaction date is required")
     private LocalDate date;

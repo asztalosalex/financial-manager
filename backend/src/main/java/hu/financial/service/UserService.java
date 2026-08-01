@@ -16,6 +16,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.Objects;
@@ -42,14 +43,6 @@ public class UserService implements UserDetailsService {
                 .orElseThrow(() -> new UserNotFoundException(id));
     }
     
-    public User getUserByEmail(String email) {
-        User user = userRepository.findByEmail(email);
-        if (user == null) {
-            throw new UserNotFoundException("User not found with email: " + email);
-        }
-        return user;
-    }
-
     public User getUserByUsername(String username) {
         User user = userRepository.findByUsername(username);
         if (user == null) {
@@ -58,6 +51,7 @@ public class UserService implements UserDetailsService {
         return user;
     }
     
+    @Transactional
     public User updateUser(Long id, UpdateProfileDto updateProfileDto) {
         User existingUser = getUserById(id);
     
@@ -77,6 +71,7 @@ public class UserService implements UserDetailsService {
         return userRepository.save(existingUser);
     }
     
+    @Transactional
     public void deleteUser(Long id) {
         if (userRepository.findById(id).isEmpty()) {
             throw new UserNotFoundException(id);
@@ -105,10 +100,6 @@ public class UserService implements UserDetailsService {
         }
     }
 
-    public boolean isUserLoggedIn() {
-        return userRepository.findByUsername(SecurityContextHolder.getContext().getAuthentication().getName()) != null;
-    }
-
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username);
@@ -127,6 +118,7 @@ public class UserService implements UserDetailsService {
         return passwordEncoder.matches(rawPassword, encodedPassword);
     }
     
+    @Transactional
     public void changePassword(Long userId, String newPassword) {
         User user = getUserById(userId);
         String encodedPassword = passwordEncoder.encode(newPassword);
@@ -138,6 +130,7 @@ public class UserService implements UserDetailsService {
         return userRepository.findByUsername(SecurityContextHolder.getContext().getAuthentication().getName());
     }
 
+    @Transactional(readOnly = true)
     public GetUserByIdDto getUserByIdDto(Long id) {
         User user = getUserById(id);
         return userMapper.toGetUserByIdDto(user);

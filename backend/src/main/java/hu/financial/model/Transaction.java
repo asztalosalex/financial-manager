@@ -15,6 +15,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import hu.financial.model.enums.TransactionType;
 import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -43,9 +44,9 @@ public class Transaction {
     private User user;
 
 
-    @Column(name = "amount", nullable = false)
+    @Column(name = "amount", nullable = false, precision = 19, scale = 2)
     @NotNull
-    private Double amount;
+    private BigDecimal amount;
 
     @Column(name = "date", nullable = false)
     @NotNull

@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
@@ -12,7 +13,7 @@ import java.time.LocalDate;
 public class BudgetResponseDto {
 
     private Long id;
-    private Double amount;
+    private BigDecimal amount;
     private LocalDate month;
     private Long categoryId;
     private String categoryName;

@@ -18,8 +18,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
 import hu.financial.dto.user.UpdateProfileDto;
 
 @ExtendWith(MockitoExtension.class)
@@ -135,25 +133,5 @@ class UserServiceTest {
         });
         verify(userRepository, times(1)).findById(userId);
         verify(userRepository, never()).deleteById(any(Long.class));
-    }
-
-    @Test
-    void isUserLoggedIn_UserExists_ReturnsTrue() {
-        // Arrange
-        String username = testUser.getUsername();
-
-        Authentication authentication = mock(Authentication.class);
-        when(authentication.getName()).thenReturn(username);
-
-        SecurityContext securityContext = mock(SecurityContext.class);
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-
-        SecurityContextHolder.setContext(securityContext);
-        
-        when(userRepository.findByUsername(username)).thenReturn(testUser);
-
-        // Act
-        assertTrue(userService.isUserLoggedIn());
-        verify(userRepository, times(1)).findByUsername(username);
     }
 }

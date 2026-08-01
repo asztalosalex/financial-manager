@@ -1,9 +1,11 @@
 package hu.financial.service;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import hu.financial.dto.user.LoginUserDto;
 import hu.financial.dto.user.RegisterUserDto;
 import hu.financial.model.User;
@@ -29,6 +31,7 @@ public class AuthenticationService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    @Transactional
     public User signup(RegisterUserDto input) {
         if (userRepository.findByEmail(input.getEmail()) != null) {
             throw new DuplicateUserException("email", input.getEmail());
@@ -42,9 +45,14 @@ public class AuthenticationService {
         user.setEmail(input.getEmail());
         user.setPassword(passwordEncoder.encode(input.getPassword()));
         user.setCreatedAt(LocalDateTime.now());
-        return userRepository.save(user);
+        try {
+            return userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateUserException("Account with this email or username already exists");
+        }
     }
 
+    @Transactional
     public User authenticate(LoginUserDto input) {
         authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(input.getEmail(), input.getPassword())

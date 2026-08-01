@@ -2,6 +2,7 @@ package hu.financial.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import hu.financial.repository.BudgetRepository;
 import hu.financial.model.Budget;
 import hu.financial.model.User;
@@ -9,6 +10,8 @@ import hu.financial.exception.budget.BudgetNotFoundException;
 import hu.financial.exception.budget.BudgetValidationException;
 import hu.financial.dto.budget.CreateBudgetDto;
 import hu.financial.dto.budget.BudgetResponseDto;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -24,6 +27,7 @@ public class BudgetService {
     @Autowired
     private UserService userService;
 
+    @Transactional
     public Budget createBudget(Budget budget) {
         validateBudgetForCreation(budget);
         return budgetRepository.save(budget);
@@ -42,6 +46,7 @@ public class BudgetService {
                 .orElseThrow(() -> new BudgetNotFoundException(id));
     }
 
+    @Transactional
     public Budget updateBudget(Long id, Budget budget) {
         Budget existingBudget = budgetRepository.findById(id)
                 .orElseThrow(() -> new BudgetNotFoundException(id));
@@ -50,6 +55,7 @@ public class BudgetService {
         return budgetRepository.save(existingBudget);
     }
 
+    @Transactional
     public void deleteBudget(Long id) {
         Budget existingBudget = budgetRepository.findById(id)
                 .orElseThrow(() -> new BudgetNotFoundException(id));
@@ -57,13 +63,13 @@ public class BudgetService {
     }
 
     private void validateBudgetForCreation(Budget budget) {
-        if (budget.getAmount() <= 0) {
+        if (budget.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BudgetValidationException("Budget amount must be greater than 0");
         }
     }
 
     private void validateBudgetForUpdate(Budget existingBudget, Budget budget) {
-        if (budget.getAmount() <= 0) {
+        if (budget.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BudgetValidationException("Budget amount must be greater than 0");
         }
     }
@@ -71,7 +77,7 @@ public class BudgetService {
     public Budget mapToEntity(CreateBudgetDto dto) {
         User currentUser = userService.getCurrentUser();
         Budget budget = new Budget();
-        budget.setAmount(dto.getAmount());
+        budget.setAmount(dto.getAmount().setScale(2, RoundingMode.HALF_UP));
         budget.setMonth(dto.getMonth());
         budget.setCategory(categoryService.getOwnedCategoryById(dto.getCategoryId(), currentUser.getId()));
         budget.setUser(currentUser);

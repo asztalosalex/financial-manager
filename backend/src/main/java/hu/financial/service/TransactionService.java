@@ -1,8 +1,11 @@
 package hu.financial.service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import hu.financial.repository.TransactionRepository;
 import hu.financial.model.Transaction;
 import hu.financial.model.User;
@@ -23,6 +26,7 @@ public class TransactionService {
   @Autowired
   private UserService userService;
 
+  @Transactional
   public Transaction createTransaction(Transaction transaction) {
     validateTransactionForCreation(transaction);
     return transactionRepository.save(transaction);
@@ -41,6 +45,7 @@ public class TransactionService {
         .orElseThrow(() -> new TransactionNotFoundException(id));
   }
 
+  @Transactional
   public Transaction updateTransaction(Long id, Transaction transaction) {
     Transaction existingTransaction = transactionRepository.findById(id)
         .orElseThrow(() -> new TransactionNotFoundException(id));
@@ -51,7 +56,7 @@ public class TransactionService {
   }
 
   private void validateTransactionForCreation(Transaction transaction) {
-    if (transaction.getAmount() <= 0) {
+    if (transaction.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
       throw new TransactionValidationException("Transaction amount must be greater than 0");
     }
   }
@@ -60,6 +65,7 @@ public class TransactionService {
     return transactionRepository.findByUserId(userId);
   }
 
+  @Transactional
   public void deleteTransaction(Long id) {
     Transaction existingTransaction = transactionRepository.findById(id)
         .orElseThrow(() -> new TransactionNotFoundException(id));
@@ -67,7 +73,7 @@ public class TransactionService {
   }
 
   private void validateTransactionForUpdate(Transaction existingTransaction, Transaction transaction) {
-    if (transaction.getAmount() <= 0) {
+    if (transaction.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
       throw new TransactionValidationException("Transaction amount must be greater than 0");
     }
   }
@@ -77,7 +83,7 @@ public class TransactionService {
     Transaction transaction = new Transaction();
     transaction.setType(dto.getType());
     transaction.setDescription(dto.getDescription());
-    transaction.setAmount(dto.getAmount());
+    transaction.setAmount(dto.getAmount().setScale(2, RoundingMode.HALF_UP));
     transaction.setDate(dto.getDate());
     transaction.setCategory(categoryService.getOwnedCategoryById(dto.getCategoryId(), currentUser.getId()));
     transaction.setUser(currentUser);
