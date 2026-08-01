@@ -156,6 +156,37 @@ public class TransactionServiceTest {
     }
 
     @Test
+    void updateTransaction_ShouldReplaceAllMutableFields_WhenFullReplacementRequested() {
+        Category newCategory = new Category("newcategory", "newdescription", testUser);
+        newCategory.setId(2L);
+        LocalDate newDate = LocalDate.now().minusDays(3);
+        Transaction replacement = new Transaction(null, TransactionType.EXPENSE, "new description",
+                newCategory, testUser, new BigDecimal("42.50"), newDate);
+
+        when(transactionRepository.findById(testTransaction.getId())).thenReturn(Optional.of(testTransaction));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Transaction result = transactionService.updateTransaction(testTransaction.getId(), replacement);
+
+        assertEquals(TransactionType.EXPENSE, result.getType());
+        assertEquals("new description", result.getDescription());
+        assertEquals(newCategory, result.getCategory());
+        assertEquals(new BigDecimal("42.50"), result.getAmount());
+        assertEquals(newDate, result.getDate());
+    }
+
+    @Test
+    void updateTransaction_ShouldThrowValidation_WhenAmountNotPositive() {
+        Transaction replacement = new Transaction(null, TransactionType.EXPENSE, "invalid",
+                testCategory, testUser, BigDecimal.ZERO, LocalDate.now());
+        when(transactionRepository.findById(testTransaction.getId())).thenReturn(Optional.of(testTransaction));
+
+        assertThrows(TransactionValidationException.class,
+                () -> transactionService.updateTransaction(testTransaction.getId(), replacement));
+        verify(transactionRepository, never()).save(any(Transaction.class));
+    }
+
+    @Test
     void updateTransaction_ShouldThrowNotFound_WhenMissing() {
         when(transactionRepository.findById(99L)).thenReturn(Optional.empty());
 

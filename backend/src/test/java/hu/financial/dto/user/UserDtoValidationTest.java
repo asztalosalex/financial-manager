@@ -93,4 +93,42 @@ public class UserDtoValidationTest {
 
         assertFalse(violations.isEmpty());
     }
+
+    @Test
+    void updateProfileDto_ShouldHaveNoViolations_WhenAllFieldsValid() {
+        UpdateProfileDto dto = new UpdateProfileDto("testuser", "test@example.com");
+
+        Set<ConstraintViolation<UpdateProfileDto>> violations = validator.validate(dto);
+
+        assertTrue(violations.isEmpty());
+    }
+
+    @Test
+    void updateProfileDto_ShouldHaveViolation_WhenUsernameBlank() {
+        UpdateProfileDto dto = new UpdateProfileDto("", "test@example.com");
+
+        Set<ConstraintViolation<UpdateProfileDto>> violations = validator.validate(dto);
+
+        assertEquals(1, violations.size());
+        assertEquals("username", violations.iterator().next().getPropertyPath().toString());
+    }
+
+    @Test
+    void updateProfileDto_ShouldHaveViolation_WhenEmailInvalid() {
+        UpdateProfileDto dto = new UpdateProfileDto("testuser", "not-an-email");
+
+        Set<ConstraintViolation<UpdateProfileDto>> violations = validator.validate(dto);
+
+        assertEquals(1, violations.size());
+        assertEquals("email", violations.iterator().next().getPropertyPath().toString());
+    }
+
+    @Test
+    void updateProfileDto_ShouldHaveViolation_WhenEmailBlank() {
+        UpdateProfileDto dto = new UpdateProfileDto("testuser", "");
+
+        Set<ConstraintViolation<UpdateProfileDto>> violations = validator.validate(dto);
+
+        assertFalse(violations.isEmpty());
+    }
 }

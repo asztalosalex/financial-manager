@@ -49,14 +49,21 @@ public class TransactionService {
   public Transaction updateTransaction(Long id, Transaction transaction) {
     Transaction existingTransaction = transactionRepository.findById(id)
         .orElseThrow(() -> new TransactionNotFoundException(id));
-    validateTransactionForUpdate(existingTransaction, transaction);
-    existingTransaction.setAmount(transaction.getAmount());
+    validateAmount(transaction.getAmount());
+    existingTransaction.setType(transaction.getType());
     existingTransaction.setDescription(transaction.getDescription());
+    existingTransaction.setCategory(transaction.getCategory());
+    existingTransaction.setAmount(transaction.getAmount());
+    existingTransaction.setDate(transaction.getDate());
     return transactionRepository.save(existingTransaction);
   }
 
   private void validateTransactionForCreation(Transaction transaction) {
-    if (transaction.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+    validateAmount(transaction.getAmount());
+  }
+
+  private void validateAmount(BigDecimal amount) {
+    if (amount.compareTo(BigDecimal.ZERO) <= 0) {
       throw new TransactionValidationException("Transaction amount must be greater than 0");
     }
   }
@@ -70,12 +77,6 @@ public class TransactionService {
     Transaction existingTransaction = transactionRepository.findById(id)
         .orElseThrow(() -> new TransactionNotFoundException(id));
     transactionRepository.delete(existingTransaction);
-  }
-
-  private void validateTransactionForUpdate(Transaction existingTransaction, Transaction transaction) {
-    if (transaction.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-      throw new TransactionValidationException("Transaction amount must be greater than 0");
-    }
   }
 
   public Transaction mapToEntity(CreateTransactionDto dto) {

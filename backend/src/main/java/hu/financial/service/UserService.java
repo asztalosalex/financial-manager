@@ -1,5 +1,6 @@
 package hu.financial.service;
 
+import hu.financial.dto.user.ChangePasswordRequestDto;
 import hu.financial.dto.user.UpdateProfileDto;
 import hu.financial.dto.user.UserResponseDto;
 import hu.financial.dto.user.GetUserByIdDto;
@@ -7,6 +8,7 @@ import hu.financial.mapper.UserMapper;
 import hu.financial.model.User;
 import hu.financial.repository.UserRepository;
 import hu.financial.exception.user.DuplicateUserException;
+import hu.financial.exception.user.InvalidPasswordException;
 import hu.financial.exception.user.UserNotFoundException;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -117,13 +119,15 @@ public class UserService implements UserDetailsService {
     public boolean verifyPassword(String rawPassword, String encodedPassword) {
         return passwordEncoder.matches(rawPassword, encodedPassword);
     }
-    
+
     @Transactional
-    public void changePassword(Long userId, String newPassword) {
-        User user = getUserById(userId);
-        String encodedPassword = passwordEncoder.encode(newPassword);
-        user.setPassword(encodedPassword);
-        userRepository.save(user);
+    public void changePassword(User user, ChangePasswordRequestDto request) {
+        if (!verifyPassword(request.getCurrentPassword(), user.getPassword())) {
+            throw new InvalidPasswordException("currentPassword", "Current password is incorrect");
+        }
+        User existingUser = getUserById(user.getId());
+        existingUser.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(existingUser);
     }
 
     public User getCurrentUser() {
@@ -134,11 +138,6 @@ public class UserService implements UserDetailsService {
     public GetUserByIdDto getUserByIdDto(Long id) {
         User user = getUserById(id);
         return userMapper.toGetUserByIdDto(user);
-    }
-
-    public UpdateProfileDto updateProfileDto(User user){
-
-        return userMapper.mapToUpdateProfileDto(user);
     }
 
     public UserResponseDto mapToUserProfileDto(User user){

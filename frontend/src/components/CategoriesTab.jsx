@@ -1,4 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  createCategory,
+  deleteCategory,
+  fetchCategories,
+  updateCategory
+} from '../api/categories';
+import { isAbortError, toFormError } from '../api/ApiError';
+import FieldError from './FieldError';
+
+const EMPTY_FORM = { name: '', description: '' };
 
 function CategoriesTab() {
   const [categories, setCategories] = useState([]);
@@ -6,51 +16,43 @@ function CategoriesTab() {
   const [error, setError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: ''
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
+  const [formFieldErrors, setFormFieldErrors] = useState({});
   const [formSuccess, setFormSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  const fetchCategories = async () => {
+  const loadCategories = useCallback(async (signal) => {
     try {
-      const res = await fetch('/api/categories/user', {});
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          window.location.href = '/login';
-          return;
-        }
-        throw new Error('Failed to fetch categories');
-      }
-
-      const data = await res.json();
+      const data = await fetchCategories(signal);
       setCategories(data);
+      setError('');
     } catch (err) {
-      setError(err.message);
+      if (isAbortError(err)) {
+        return;
+      }
+      setError(toFormError(err).message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadCategories(controller.signal);
+    return () => controller.abort();
+  }, [loadCategories]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setFormError('');
   };
 
   const resetForm = () => {
-    setFormData({ name: '', description: '' });
+    setFormData(EMPTY_FORM);
     setFormError('');
-    setFormSuccess('');
+    setFormFieldErrors({});
     setShowCreateForm(false);
     setEditingCategory(null);
   };
@@ -58,6 +60,7 @@ function CategoriesTab() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
+    setFormFieldErrors({});
     setFormSuccess('');
 
     if (!formData.name.trim() || !formData.description.trim()) {
@@ -65,58 +68,32 @@ function CategoriesTab() {
       return;
     }
 
+    setSubmitting(true);
     try {
-      let url = '/api/categories';
-      let method = 'POST';
-
       if (editingCategory) {
-        url = `/api/categories/${editingCategory.id}`;
-        method = 'PUT';
-      }
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          window.location.href = '/login';
-          return;
-        }
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Failed to save category');
-      }
-
-      if (editingCategory) {
+        const updated = await updateCategory(editingCategory.id, formData);
+        setCategories((prev) => prev.map((cat) => (cat.id === updated.id ? updated : cat)));
         setFormSuccess('Category updated successfully');
-        // Update the category in the list
-        setCategories(prev => prev.map(cat => 
-          cat.id === editingCategory.id 
-            ? { ...cat, name: formData.name, description: formData.description }
-            : cat
-        ));
       } else {
-        const newCategory = await res.json();
-        setCategories(prev => [...prev, newCategory]);
+        const created = await createCategory(formData);
+        setCategories((prev) => [...prev, created]);
         setFormSuccess('Category created successfully');
       }
-
       resetForm();
     } catch (err) {
-      setFormError(err.message);
+      const parsed = toFormError(err);
+      setFormError(parsed.message);
+      setFormFieldErrors(parsed.fieldErrors);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleEdit = (category) => {
     setEditingCategory(category);
-    setFormData({
-      name: category.name,
-      description: category.description
-    });
+    setFormData({ name: category.name, description: category.description });
+    setFormError('');
+    setFormFieldErrors({});
     setShowCreateForm(true);
   };
 
@@ -125,23 +102,14 @@ function CategoriesTab() {
       return;
     }
 
+    setFormError('');
+    setFormSuccess('');
     try {
-      const res = await fetch(`/api/categories/${categoryId}`, {
-        method: 'DELETE'
-      });
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          window.location.href = '/login';
-          return;
-        }
-        throw new Error('Failed to delete category');
-      }
-
-      setCategories(prev => prev.filter(cat => cat.id !== categoryId));
+      await deleteCategory(categoryId);
+      setCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
       setFormSuccess('Category deleted successfully');
     } catch (err) {
-      setFormError(err.message);
+      setFormError(toFormError(err).message);
     }
   };
 
@@ -149,7 +117,7 @@ function CategoriesTab() {
     return (
       <div className="tab-content">
         <h2>Categories</h2>
-        <div className="loading">Loading categories...</div>
+        <div className="loading" role="status">Loading categories...</div>
       </div>
     );
   }
@@ -158,30 +126,19 @@ function CategoriesTab() {
     <div className="tab-content">
       <div className="categories-header">
         <h2>Categories</h2>
-        <button 
-          className="btn-primary"
-          onClick={() => setShowCreateForm(true)}
-        >
+        <button className="btn-primary" onClick={() => setShowCreateForm(true)}>
           Add New Category
         </button>
       </div>
 
-      {error && (
-        <div className="auth-error">{error}</div>
-      )}
-
-      {formError && (
-        <div className="auth-error">{formError}</div>
-      )}
-
-      {formSuccess && (
-        <div className="auth-success">{formSuccess}</div>
-      )}
+      {error && <div className="auth-error" role="alert">{error}</div>}
+      {formError && <div className="auth-error" role="alert">{formError}</div>}
+      {formSuccess && <div className="auth-success" role="status">{formSuccess}</div>}
 
       {showCreateForm && (
         <div className="category-form-section">
           <h3>{editingCategory ? 'Edit Category' : 'Create New Category'}</h3>
-          <form onSubmit={handleSubmit} className="category-form">
+          <form onSubmit={handleSubmit} className="category-form" noValidate>
             <div className="form-group">
               <label htmlFor="name">Category Name:</label>
               <input
@@ -191,8 +148,10 @@ function CategoriesTab() {
                 value={formData.name}
                 onChange={handleInputChange}
                 placeholder="Enter category name"
+                aria-invalid={Boolean(formFieldErrors.name)}
                 required
               />
+              <FieldError message={formFieldErrors.name} />
             </div>
             <div className="form-group">
               <label htmlFor="description">Description:</label>
@@ -203,18 +162,16 @@ function CategoriesTab() {
                 onChange={handleInputChange}
                 placeholder="Enter category description"
                 rows="3"
+                aria-invalid={Boolean(formFieldErrors.description)}
                 required
               />
+              <FieldError message={formFieldErrors.description} />
             </div>
             <div className="form-actions">
-              <button type="submit" className="btn-primary">
-                {editingCategory ? 'Update Category' : 'Create Category'}
+              <button type="submit" className="btn-primary" disabled={submitting}>
+                {submitting ? 'Saving...' : editingCategory ? 'Update Category' : 'Create Category'}
               </button>
-              <button 
-                type="button" 
-                className="btn-secondary"
-                onClick={resetForm}
-              >
+              <button type="button" className="btn-secondary" onClick={resetForm} disabled={submitting}>
                 Cancel
               </button>
             </div>
@@ -235,16 +192,18 @@ function CategoriesTab() {
                 <div className="category-header">
                   <h4>{category.name}</h4>
                   <div className="category-actions">
-                    <button 
+                    <button
                       className="btn-edit"
                       onClick={() => handleEdit(category)}
+                      aria-label={`Edit ${category.name}`}
                       title="Edit category"
                     >
                       ✏️
                     </button>
-                    <button 
+                    <button
                       className="btn-delete"
                       onClick={() => handleDelete(category.id)}
+                      aria-label={`Delete ${category.name}`}
                       title="Delete category"
                     >
                       🗑️

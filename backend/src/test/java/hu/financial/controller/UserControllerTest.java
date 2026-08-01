@@ -1,13 +1,14 @@
 package hu.financial.controller;
 
+import hu.financial.dto.user.ChangePasswordRequestDto;
 import hu.financial.dto.user.GetUserByIdDto;
 import hu.financial.model.User;
 import hu.financial.service.UserService;
-import hu.financial.service.AuthenticationService;
-import hu.financial.service.JwtService;
+import hu.financial.exception.user.InvalidPasswordException;
 import hu.financial.exception.user.UserNotFoundException;
 import hu.financial.dto.user.UserResponseDto;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -17,6 +18,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import hu.financial.dto.user.UpdateProfileDto;
+
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,143 +31,115 @@ class UserControllerTest {
   @Mock
   private UserService userService;
 
-  @Mock
-  private AuthenticationService authenticationService;
-
-  @Mock
-  private JwtService jwtService;
-
-  @Mock
-  private UserResponseDto userResponseDto;
-
   @InjectMocks
   private UserController userController;
 
-  @Test
-  void getUserById_UserNotFound_Returns404() {
-    Long userId = 999L;
-    User currentUser = new User("testuser", "password", "test@example.com");
-    currentUser.setId(userId);
-    Authentication authentication = mock(Authentication.class);
+  private User currentUser;
+  private Authentication authentication;
+
+  @BeforeEach
+  void setUp() {
+    currentUser = new User("testuser", "password", "test@example.com");
+    currentUser.setId(1L);
+    authentication = mock(Authentication.class);
     when(authentication.getPrincipal()).thenReturn(currentUser);
-
-    when(userService.getUserByIdDto(userId))
-        .thenThrow(new UserNotFoundException(userId));
-
-    ResponseEntity<GetUserByIdDto> response = userController.getUserById(userId, authentication);
-
-    assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
   }
 
   @Test
-  void getUserById_ForeignId_Returns404_AndDoesNotExposeOtherUsersData() {
-    Long ownId = 1L;
-    Long foreignId = 2L;
-    User currentUser = new User("testuser", "password", "test@example.com");
-    currentUser.setId(ownId);
-    Authentication authentication = mock(Authentication.class);
-    when(authentication.getPrincipal()).thenReturn(currentUser);
+  void getUserById_UserNotFound_ThrowsUserNotFoundException() {
+    when(userService.getUserByIdDto(1L)).thenThrow(new UserNotFoundException(1L));
 
-    ResponseEntity<GetUserByIdDto> response = userController.getUserById(foreignId, authentication);
+    assertThrows(UserNotFoundException.class, () -> userController.getUserById(1L, authentication));
+  }
 
-    assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-    assertNull(response.getBody());
+  @Test
+  void getUserById_ForeignId_ThrowsUserNotFoundException_AndDoesNotExposeOtherUsersData() {
+    assertThrows(UserNotFoundException.class, () -> userController.getUserById(2L, authentication));
+
     verify(userService, never()).getUserByIdDto(any());
   }
 
   @Test
   void getUserById_OwnId_ReturnsOwnData() {
-    Long ownId = 1L;
-    User currentUser = new User("testuser", "password", "test@example.com");
-    currentUser.setId(ownId);
-    Authentication authentication = mock(Authentication.class);
-    when(authentication.getPrincipal()).thenReturn(currentUser);
+    GetUserByIdDto expectedDto = new GetUserByIdDto(1L, "testuser", java.util.Collections.emptyList());
+    when(userService.getUserByIdDto(1L)).thenReturn(expectedDto);
 
-    GetUserByIdDto expectedDto = new GetUserByIdDto(ownId, "testuser", java.util.Collections.emptyList());
-    when(userService.getUserByIdDto(ownId)).thenReturn(expectedDto);
-
-    ResponseEntity<GetUserByIdDto> response = userController.getUserById(ownId, authentication);
+    ResponseEntity<GetUserByIdDto> response = userController.getUserById(1L, authentication);
 
     assertEquals(HttpStatus.OK, response.getStatusCode());
     assertEquals(expectedDto, response.getBody());
   }
 
   @Test
-  void updateUser_Success() {
-
+  void updateUser_OwnId_ReturnsUpdatedProfile() {
     UpdateProfileDto updateProfileDto = new UpdateProfileDto("updateduser", "updated@example.com");
-    Long userId = 1L;
-    String authHeader = "Bearer validToken";
-    String username = "testuser";
-    User currentUser = new User("testuser", "password", "test@example.com");
-    currentUser.setId(userId);
+    UserResponseDto expectedDto = new UserResponseDto(1L, "updateduser", "updated@example.com",
+        LocalDateTime.now(), null);
+    when(userService.updateUser(1L, updateProfileDto)).thenReturn(currentUser);
+    when(userService.mapToUserProfileDto(currentUser)).thenReturn(expectedDto);
 
-    when(jwtService.extractUsername("validToken")).thenReturn(username);
-    when(userService.getUserByUsername(username)).thenReturn(currentUser);
-    when(userService.updateUser(userId, updateProfileDto)).thenReturn(currentUser);
+    ResponseEntity<UserResponseDto> response = userController.updateUser(1L, updateProfileDto, authentication);
 
-    // Act
-    ResponseEntity<?> response = userController.updateUser(userId, updateProfileDto, authHeader);
-
-    // Assert
     assertEquals(HttpStatus.OK, response.getStatusCode());
+    assertEquals(expectedDto, response.getBody());
   }
 
   @Test
-  void deleteUser_Success() {
-    // Arrange
-    Long userId = 1L;
-    String authHeader = "Bearer validToken";
-    String username = "testuser";
-    User currentUser = new User("testuser", "password", "test@example.com");
-    currentUser.setId(userId);
+  void updateUser_ForeignId_ThrowsUserNotFoundException() {
+    UpdateProfileDto updateProfileDto = new UpdateProfileDto("updateduser", "updated@example.com");
 
-    when(jwtService.extractUsername("validToken")).thenReturn(username);
-    when(userService.getUserByUsername(username)).thenReturn(currentUser);
-    doNothing().when(userService).deleteUser(userId);
+    assertThrows(UserNotFoundException.class,
+        () -> userController.updateUser(2L, updateProfileDto, authentication));
 
-    // Act
-    ResponseEntity<?> response = userController.deleteUser(userId, authHeader);
+    verify(userService, never()).updateUser(any(), any());
+  }
 
-    // Assert
+  @Test
+  void deleteUser_OwnId_ReturnsNoContent() {
+    doNothing().when(userService).deleteUser(1L);
+
+    ResponseEntity<Void> response = userController.deleteUser(1L, authentication);
+
     assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-    verify(userService).deleteUser(userId);
+    verify(userService).deleteUser(1L);
   }
 
   @Test
-  void deleteUser_Unauthorized_ReturnsUnauthorized() {
-    // Arrange
-    Long userId = 1L;
-    String authHeader = "Bearer invalidToken";
+  void deleteUser_ForeignId_ThrowsUserNotFoundException() {
+    assertThrows(UserNotFoundException.class, () -> userController.deleteUser(2L, authentication));
 
-    when(jwtService.extractUsername("invalidToken")).thenThrow(new RuntimeException("Invalid token"));
-
-    // Act
-    ResponseEntity<?> response = userController.deleteUser(userId, authHeader);
-
-    // Assert
-    assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-    assertEquals("Authentication failed", response.getBody());
+    verify(userService, never()).deleteUser(any());
   }
 
   @Test
-  void deleteUser_Forbidden_ReturnsForbidden() {
-    // Arrange
-    Long userId = 1L;
-    Long differentUserId = 2L;
-    String authHeader = "Bearer validToken";
-    String username = "testuser";
-    User currentUser = new User("testuser", "password", "test@example.com");
-    currentUser.setId(differentUserId); // Different user ID
+  void changePassword_ValidRequest_ReturnsNoContent() {
+    ChangePasswordRequestDto request = new ChangePasswordRequestDto("current123", "newpassword123");
 
-    when(jwtService.extractUsername("validToken")).thenReturn(username);
-    when(userService.getUserByUsername(username)).thenReturn(currentUser);
+    ResponseEntity<Void> response = userController.changePassword(authentication, request);
 
-    // Act
-    ResponseEntity<?> response = userController.deleteUser(userId, authHeader);
+    assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+    assertNull(response.getBody());
+    verify(userService).changePassword(currentUser, request);
+  }
 
-    // Assert
-    assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-    assertEquals("You can only delete your own account", response.getBody());
+  @Test
+  void changePassword_WrongCurrentPassword_PropagatesInvalidPasswordException() {
+    ChangePasswordRequestDto request = new ChangePasswordRequestDto("wrong", "newpassword123");
+    doThrow(new InvalidPasswordException("currentPassword", "Current password is incorrect"))
+        .when(userService).changePassword(currentUser, request);
+
+    assertThrows(InvalidPasswordException.class, () -> userController.changePassword(authentication, request));
+  }
+
+  @Test
+  void getCurrentUserProfile_ReturnsProfileOfAuthenticatedUser() {
+    UserResponseDto expectedDto = new UserResponseDto(1L, "testuser", "test@example.com",
+        LocalDateTime.now(), null);
+    when(userService.mapToUserProfileDto(currentUser)).thenReturn(expectedDto);
+
+    ResponseEntity<UserResponseDto> response = userController.getCurrentUserProfile(authentication);
+
+    assertEquals(HttpStatus.OK, response.getStatusCode());
+    assertEquals(expectedDto, response.getBody());
   }
 }

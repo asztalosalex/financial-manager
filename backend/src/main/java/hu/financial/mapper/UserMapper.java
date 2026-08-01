@@ -1,7 +1,6 @@
 package hu.financial.mapper;
 
 import hu.financial.dto.user.GetUserByIdDto;
-import hu.financial.dto.user.UpdateProfileDto;
 import hu.financial.dto.user.UserResponseDto;
 import hu.financial.model.User;
 import org.springframework.stereotype.Component;
@@ -33,12 +32,6 @@ public class UserMapper {
             .stream()
             .map(categoryMapper::toDto)
             .toList());
-  }
-
-  public UpdateProfileDto mapToUpdateProfileDto(User user) {
-    return new UpdateProfileDto(
-        user.getUsername(),
-        user.getEmail());
   }
 
 }

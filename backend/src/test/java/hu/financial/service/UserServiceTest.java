@@ -8,9 +8,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import hu.financial.dto.user.ChangePasswordRequestDto;
+import hu.financial.exception.user.InvalidPasswordException;
 import hu.financial.exception.user.UserNotFoundException;
 import hu.financial.model.User;
 import hu.financial.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
@@ -25,6 +28,9 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private UserService userService;
@@ -133,5 +139,31 @@ class UserServiceTest {
         });
         verify(userRepository, times(1)).findById(userId);
         verify(userRepository, never()).deleteById(any(Long.class));
+    }
+
+    @Test
+    void changePassword_CorrectCurrentPassword_StoresEncodedNewPassword() {
+        ChangePasswordRequestDto request = new ChangePasswordRequestDto("current123", "newpassword123");
+        when(passwordEncoder.matches("current123", testUser.getPassword())).thenReturn(true);
+        when(passwordEncoder.encode("newpassword123")).thenReturn("encoded-new-password");
+        when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
+
+        userService.changePassword(testUser, request);
+
+        assertEquals("encoded-new-password", testUser.getPassword());
+        verify(userRepository, times(1)).save(testUser);
+    }
+
+    @Test
+    void changePassword_WrongCurrentPassword_ThrowsInvalidPasswordException() {
+        ChangePasswordRequestDto request = new ChangePasswordRequestDto("wrong", "newpassword123");
+        when(passwordEncoder.matches("wrong", testUser.getPassword())).thenReturn(false);
+
+        InvalidPasswordException exception = assertThrows(InvalidPasswordException.class,
+                () -> userService.changePassword(testUser, request));
+
+        assertEquals("currentPassword", exception.getField());
+        verify(userRepository, never()).save(any(User.class));
+        verify(passwordEncoder, never()).encode(any());
     }
 }

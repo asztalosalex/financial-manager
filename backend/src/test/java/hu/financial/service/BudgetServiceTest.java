@@ -119,6 +119,33 @@ public class BudgetServiceTest {
     }
 
     @Test
+    void updateBudget_ShouldReplaceAmountMonthAndCategory_WhenFullReplacementRequested() {
+        Category newCategory = new Category("newcategory", "newdescription", testUser);
+        newCategory.setId(2L);
+        LocalDate newMonth = LocalDate.now().plusMonths(1);
+        Budget replacement = new Budget(null, new BigDecimal("250.00"), newMonth, testUser, newCategory);
+
+        when(budgetRepository.findById(testBudget.getId())).thenReturn(Optional.of(testBudget));
+        when(budgetRepository.save(any(Budget.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Budget result = budgetService.updateBudget(testBudget.getId(), replacement);
+
+        assertEquals(new BigDecimal("250.00"), result.getAmount());
+        assertEquals(newMonth, result.getMonth());
+        assertEquals(newCategory, result.getCategory());
+    }
+
+    @Test
+    void updateBudget_ShouldThrowValidation_WhenAmountNotPositive() {
+        Budget replacement = new Budget(null, BigDecimal.ZERO, LocalDate.now(), testUser, testCategory);
+        when(budgetRepository.findById(testBudget.getId())).thenReturn(Optional.of(testBudget));
+
+        assertThrows(BudgetValidationException.class,
+                () -> budgetService.updateBudget(testBudget.getId(), replacement));
+        verify(budgetRepository, never()).save(any(Budget.class));
+    }
+
+    @Test
     void updateBudget_ShouldThrowNotFound_WhenMissing() {
         when(budgetRepository.findById(99L)).thenReturn(Optional.empty());
 

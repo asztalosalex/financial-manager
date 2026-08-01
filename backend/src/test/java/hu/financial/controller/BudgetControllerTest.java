@@ -15,6 +15,7 @@ import hu.financial.model.Budget;
 import hu.financial.dto.budget.CreateBudgetDto;
 import hu.financial.dto.budget.BudgetResponseDto;
 import hu.financial.exception.budget.BudgetNotFoundException;
+import hu.financial.exception.category.CategoryNotFoundException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -143,6 +144,18 @@ public class BudgetControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         verify(budgetService).updateBudget(eq(testBudget.getId()), any(Budget.class));
+    }
+
+    @Test
+    void updateBudget_ShouldThrowNotFound_WhenNewCategoryOwnedByAnotherUser() {
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(budgetService.getBudgetById(testBudget.getId())).thenReturn(testBudget);
+        when(budgetService.mapToEntity(any(CreateBudgetDto.class)))
+                .thenThrow(new CategoryNotFoundException(99L));
+
+        assertThrows(CategoryNotFoundException.class,
+                () -> budgetController.updateBudget(testBudget.getId(), createBudgetDto));
+        verify(budgetService, never()).updateBudget(any(), any());
     }
 
     @Test

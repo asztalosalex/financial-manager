@@ -9,18 +9,18 @@ import hu.financial.dto.user.LoginUserDto;
 import hu.financial.dto.user.RegisterUserDto;
 import hu.financial.dto.user.UserResponseDto;
 import hu.financial.mapper.UserMapper;
+import hu.financial.security.SecurityCookieFactory;
 import hu.financial.service.AuthenticationService;
 import hu.financial.service.JwtService;
 import org.springframework.http.ResponseEntity;
 import hu.financial.model.User;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
-import java.time.Duration;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.http.HttpHeaders;
 
@@ -34,47 +34,46 @@ public class AuthenticationController {
     private final JwtService jwtService;
     private final AuthenticationService authenticationService;
     private final UserMapper userMapper;
+    private final SecurityCookieFactory securityCookieFactory;
 
     public AuthenticationController(JwtService jwtService, AuthenticationService authenticationService,
-            UserMapper userMapper) {
+            UserMapper userMapper, SecurityCookieFactory securityCookieFactory) {
         this.jwtService = jwtService;
         this.authenticationService = authenticationService;
         this.userMapper = userMapper;
+        this.securityCookieFactory = securityCookieFactory;
     }
 
+    @Operation(summary = "Register a new user")
     @PostMapping("/signup")
     public ResponseEntity<UserResponseDto> signup(@Valid @RequestBody RegisterUserDto input) {
         User registeredUser = authenticationService.signup(input);
         return ResponseEntity.ok(userMapper.mapToDto(registeredUser));
     }
 
+    @Operation(summary = "Log in and receive the authentication cookie")
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginUserDto input) {
         try {
             User user = authenticationService.authenticate(input);
             String token = jwtService.generateToken(user);
-            Long expiresIn = jwtService.getExpirationTime();
-            LoginResponse response = new LoginResponse(expiresIn, "success");
+            LoginResponse response = new LoginResponse(jwtService.getExpirationTime(), "success");
 
-            ResponseCookie cookie = ResponseCookie.from("authToken", token)
-            .httpOnly(true)
-            .secure(true)
-            .sameSite("None")
-            .path("/")
-            .maxAge(Duration.ofMinutes(120))
-            .build();
-
-            return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).body(response);
-
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, securityCookieFactory.createAuthCookie(token).toString())
+                    .body(response);
         } catch (AuthenticationException e) {
             log.warn("Failed login attempt for email: {}", input.getEmail());
-            LoginResponse response = new LoginResponse(null, "invalid_credentials");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-        } catch (Exception e) {
-            log.error("Unexpected error during login", e);
-            LoginResponse response = new LoginResponse(null, "internal_server_error");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new LoginResponse(null, "invalid_credentials"));
         }
     }
 
+    @Operation(summary = "Log out and clear the authentication cookie")
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout() {
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, securityCookieFactory.expireAuthCookie().toString())
+                .build();
+    }
 }

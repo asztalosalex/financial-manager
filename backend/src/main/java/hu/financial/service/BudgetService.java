@@ -50,8 +50,10 @@ public class BudgetService {
     public Budget updateBudget(Long id, Budget budget) {
         Budget existingBudget = budgetRepository.findById(id)
                 .orElseThrow(() -> new BudgetNotFoundException(id));
-        validateBudgetForUpdate(existingBudget, budget);
+        validateAmount(budget.getAmount());
         existingBudget.setAmount(budget.getAmount());
+        existingBudget.setMonth(budget.getMonth());
+        existingBudget.setCategory(budget.getCategory());
         return budgetRepository.save(existingBudget);
     }
 
@@ -63,13 +65,11 @@ public class BudgetService {
     }
 
     private void validateBudgetForCreation(Budget budget) {
-        if (budget.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BudgetValidationException("Budget amount must be greater than 0");
-        }
+        validateAmount(budget.getAmount());
     }
 
-    private void validateBudgetForUpdate(Budget existingBudget, Budget budget) {
-        if (budget.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+    private void validateAmount(BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BudgetValidationException("Budget amount must be greater than 0");
         }
     }

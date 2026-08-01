@@ -15,6 +15,7 @@ import hu.financial.model.Transaction;
 import hu.financial.model.enums.TransactionType;
 import hu.financial.dto.transaction.CreateTransactionDto;
 import hu.financial.dto.transaction.TransactionResponseDto;
+import hu.financial.exception.category.CategoryNotFoundException;
 import hu.financial.exception.transaction.TransactionNotFoundException;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -147,6 +148,18 @@ public class TransactionControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         verify(transactionService).updateTransaction(eq(testTransaction.getId()), any(Transaction.class));
+    }
+
+    @Test
+    void updateTransaction_ShouldThrowNotFound_WhenNewCategoryOwnedByAnotherUser() {
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(transactionService.getTransactionById(testTransaction.getId())).thenReturn(testTransaction);
+        when(transactionService.mapToEntity(any(CreateTransactionDto.class)))
+                .thenThrow(new CategoryNotFoundException(99L));
+
+        assertThrows(CategoryNotFoundException.class,
+                () -> transactionController.updateTransaction(testTransaction.getId(), createTransactionDto));
+        verify(transactionService, never()).updateTransaction(any(), any());
     }
 
     @Test

@@ -1,6 +1,9 @@
 package hu.financial.exception;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.time.LocalDateTime;
+import java.util.Map;
 
 public class ErrorResponse {
     private LocalDateTime timestamp;
@@ -8,6 +11,9 @@ public class ErrorResponse {
     private String error;
     private String message;
     private String path;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Map<String, String> fieldErrors;
 
     public ErrorResponse() {
         this.timestamp = LocalDateTime.now();
@@ -21,7 +27,11 @@ public class ErrorResponse {
         this.path = path;
     }
 
-    // Getters and Setters
+    public ErrorResponse(int status, String error, String message, String path, Map<String, String> fieldErrors) {
+        this(status, error, message, path);
+        this.fieldErrors = fieldErrors;
+    }
+
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
@@ -61,4 +71,12 @@ public class ErrorResponse {
     public void setPath(String path) {
         this.path = path;
     }
-} 
+
+    public Map<String, String> getFieldErrors() {
+        return fieldErrors;
+    }
+
+    public void setFieldErrors(Map<String, String> fieldErrors) {
+        this.fieldErrors = fieldErrors;
+    }
+}

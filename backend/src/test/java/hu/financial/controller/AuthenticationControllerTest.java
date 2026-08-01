@@ -6,7 +6,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
 
@@ -16,12 +18,15 @@ import hu.financial.dto.user.UserResponseDto;
 import hu.financial.mapper.UserMapper;
 import hu.financial.model.User;
 import hu.financial.responses.LoginResponse;
+import hu.financial.security.SecurityCookieFactory;
 import hu.financial.service.AuthenticationService;
 import hu.financial.service.JwtService;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +40,9 @@ public class AuthenticationControllerTest {
 
     @Mock
     private UserMapper userMapper;
+
+    @Mock
+    private SecurityCookieFactory securityCookieFactory;
 
     @InjectMocks
     private AuthenticationController authenticationController;
@@ -52,101 +60,103 @@ public class AuthenticationControllerTest {
         loginUserDto = new LoginUserDto("test@example.com", "password123");
     }
 
+    private void stubSuccessfulLogin() {
+        when(authenticationService.authenticate(any(LoginUserDto.class))).thenReturn(testUser);
+        when(jwtService.generateToken(any(User.class))).thenReturn("token");
+        when(securityCookieFactory.createAuthCookie("token")).thenReturn(
+                ResponseCookie.from("authToken", "token").maxAge(Duration.ofSeconds(3600)).path("/").build());
+    }
+
     @Test
     void signup_ShouldReturnUserResponseDto_WhenValidRegistrationData() {
-        // Arrange
         UserResponseDto responseDto = new UserResponseDto(
                 testUser.getId(), testUser.getUsername(), testUser.getEmail(), testUser.getCreatedAt(), null);
         when(authenticationService.signup(any(RegisterUserDto.class))).thenReturn(testUser);
         when(userMapper.mapToDto(testUser)).thenReturn(responseDto);
 
-        // Act
         ResponseEntity<UserResponseDto> response = authenticationController.signup(registerUserDto);
 
-        // Assert
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
 
         assertEquals(testUser.getUsername(), response.getBody().getUsername());
         assertEquals(testUser.getEmail(), response.getBody().getEmail());
+        assertNull(response.getHeaders().getFirst(HttpHeaders.SET_COOKIE));
 
         verify(authenticationService, times(1)).signup(registerUserDto);
     }
 
-    
     @Test
     void login_ShouldReturnUnauthorized_WhenAuthenticationException() {
-        // Arrange
         when(authenticationService.authenticate(any(LoginUserDto.class)))
-            .thenThrow(new AuthenticationException("Invalid credentials") {});
+                .thenThrow(new AuthenticationException("Invalid credentials") {
+                });
 
-        // Act
         ResponseEntity<LoginResponse> response = authenticationController.login(loginUserDto);
 
-        // Assert
         assertNotNull(response);
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-        assertEquals("invalid_credentials", response.getBody().getStatus());
-        
+        assertEquals("invalid_credentials", response.getBody().getMessage());
+        assertNull(response.getBody().getExpiresIn());
+
         verify(authenticationService, times(1)).authenticate(loginUserDto);
         verify(jwtService, never()).generateToken(any(User.class));
+        verify(securityCookieFactory, never()).createAuthCookie(any());
     }
 
-
     @Test
-    void login_ShouldReturnInternalServerError_WhenUnexpectedException() {
-        // Arrange
+    void login_ShouldPropagateUnexpectedException_ToGlobalExceptionHandler() {
         when(authenticationService.authenticate(any(LoginUserDto.class)))
-            .thenThrow(new RuntimeException("Unexpected error"));
+                .thenThrow(new RuntimeException("Unexpected error"));
 
-        // Act
-        ResponseEntity<LoginResponse> response = authenticationController.login(loginUserDto);
+        assertThrows(RuntimeException.class, () -> authenticationController.login(loginUserDto));
 
-        // Assert
-        assertNotNull(response);
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-        assertEquals("internal_server_error", response.getBody().getStatus());
-        
-        verify(authenticationService, times(1)).authenticate(loginUserDto);
         verify(jwtService, never()).generateToken(any(User.class));
     }
 
     @Test
     void signup_ShouldCallAuthenticationService_WithCorrectDto() {
-        // Arrange
         when(authenticationService.signup(any(RegisterUserDto.class))).thenReturn(testUser);
 
-        // Act
         authenticationController.signup(registerUserDto);
 
-        // Assert
         verify(authenticationService, times(1)).signup(registerUserDto);
     }
 
     @Test
-    void login_ShouldCallAuthenticationService_WithCorrectDto() {
-        // Arrange
-        when(authenticationService.authenticate(any(LoginUserDto.class))).thenReturn(testUser);
-        when(jwtService.generateToken(any(User.class))).thenReturn("token");
+    void login_ShouldReturnSuccessWithExpiryFromJwtService_AndSetAuthCookie() {
+        stubSuccessfulLogin();
+        when(jwtService.getExpirationTime()).thenReturn(3600L);
 
-        // Act
-        authenticationController.login(loginUserDto);
+        ResponseEntity<LoginResponse> response = authenticationController.login(loginUserDto);
 
-        // Assert
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("success", response.getBody().getMessage());
+        assertEquals(3600L, response.getBody().getExpiresIn());
+        assertTrue(response.getHeaders().getFirst(HttpHeaders.SET_COOKIE).startsWith("authToken=token"));
         verify(authenticationService, times(1)).authenticate(loginUserDto);
     }
 
     @Test
     void login_ShouldCallJwtService_WithCorrectUser() {
-        // Arrange
-        when(authenticationService.authenticate(any(LoginUserDto.class))).thenReturn(testUser);
-        when(jwtService.generateToken(any(User.class))).thenReturn("token");
+        stubSuccessfulLogin();
 
-        // Act
         authenticationController.login(loginUserDto);
 
-        // Assert
         verify(jwtService, times(1)).generateToken(testUser);
+        verify(securityCookieFactory, times(1)).createAuthCookie("token");
+    }
+
+    @Test
+    void logout_ShouldReturnNoContent_AndSendExpiredCookie() {
+        when(securityCookieFactory.expireAuthCookie()).thenReturn(
+                ResponseCookie.from("authToken", "").maxAge(Duration.ZERO).path("/").build());
+
+        ResponseEntity<Void> response = authenticationController.logout();
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        assertNull(response.getBody());
+        assertTrue(response.getHeaders().getFirst(HttpHeaders.SET_COOKIE).contains("Max-Age=0"));
     }
 }
