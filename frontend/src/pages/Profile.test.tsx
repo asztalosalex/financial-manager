@@ -50,6 +50,14 @@ function submitProfileEdit({ username, email }: UpdateProfileDto) {
   })
 }
 
+function profileEditForm(): HTMLFormElement {
+  const form = screen.getByLabelText('Email:').closest('form')
+  if (form === null) {
+    throw new Error('the profile edit form is not rendered')
+  }
+  return form
+}
+
 function clickDeleteAccount() {
   return act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete Account' }))
@@ -94,6 +102,34 @@ describe('Profile', () => {
     expect(auth.setUser).toHaveBeenCalledTimes(1)
     expect(auth.setUser).toHaveBeenCalledWith(updated)
     expect(screen.getByText('Profile updated successfully.')).toHaveClass('auth-success')
+  })
+
+  it('saves on form submit and stops the browser from leaving the page', async () => {
+    const updated: UserResponseDto = { ...USER, email: 'submitted@example.com' }
+    vi.mocked(globalThis.fetch).mockImplementation(() => Promise.resolve(jsonResponse(200, updated)))
+
+    const auth = renderProfile()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Profile' }))
+    fireEvent.change(screen.getByLabelText('Email:'), {
+      target: { value: 'submitted@example.com' },
+    })
+
+    const submitEvent = new Event('submit', { bubbles: true, cancelable: true })
+    await act(async () => {
+      profileEditForm().dispatchEvent(submitEvent)
+    })
+
+    expect(submitEvent.defaultPrevented).toBe(true)
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+    const [url, init] = lastRequest()
+    expect(url).toBe('/api/users/7')
+    expect(init?.method).toBe('PUT')
+    expect(JSON.parse(init?.body as string)).toEqual({
+      username: 'alex',
+      email: 'submitted@example.com',
+    })
+    expect(auth.setUser).toHaveBeenCalledWith(updated)
+    expect(screen.getByText('Profile updated successfully.')).toBeInTheDocument()
   })
 
   it('places 400 field errors beside their fields using the Java property keys', async () => {

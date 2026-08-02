@@ -1,13 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import Login from './Login'
 import { AuthContext, type AuthContextValue } from '../auth/AuthContext'
 import { setUnauthorizedHandler } from '../api/client'
 import { errorResponse, jsonResponse } from '../test/helpers'
 import type { LoginUserDto } from '../api/types'
 
-function renderLogin() {
+function LocationProbe() {
+  const location = useLocation()
+  return <span data-testid="location">{location.pathname}</span>
+}
+
+function currentPath() {
+  return screen.getByTestId('location').textContent
+}
+
+function renderLogin(bouncedFrom?: unknown) {
   const auth = {
     status: 'anonymous',
     user: null,
@@ -19,12 +28,19 @@ function renderLogin() {
     clearSession: vi.fn(),
   } satisfies AuthContextValue
 
+  const entry =
+    bouncedFrom === undefined
+      ? { pathname: '/login' }
+      : { pathname: '/login', state: { from: bouncedFrom } }
+
   render(
-    <MemoryRouter initialEntries={['/login']}>
+    <MemoryRouter initialEntries={[entry]}>
       <AuthContext.Provider value={auth}>
+        <LocationProbe />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/profile" element={<div>Profile page</div>} />
+          <Route path="/profile/transactions" element={<div>Transactions page</div>} />
         </Routes>
       </AuthContext.Provider>
     </MemoryRouter>,
@@ -69,6 +85,39 @@ describe('Login', () => {
       password: 'secret123',
     })
     expect(auth.refresh).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('Profile page')).toBeInTheDocument()
+  })
+
+  it('returns the user to the protected path that bounced them, not a fixed default', async () => {
+    vi.mocked(globalThis.fetch).mockImplementation(() =>
+      Promise.resolve(jsonResponse(200, { expiresIn: 3600, message: 'success' })),
+    )
+
+    renderLogin('/profile/transactions')
+    await submitLogin({ email: 'alex@example.com', password: 'secret123' })
+
+    expect(currentPath()).toBe('/profile/transactions')
+    expect(screen.getByText('Transactions page')).toBeInTheDocument()
+    expect(screen.queryByText('Profile page')).not.toBeInTheDocument()
+  })
+
+  it.each<[string, unknown]>([
+    ['an absolute URL', 'https://evil.example/'],
+    ['a protocol-relative URL', '//evil.example/'],
+    ['a backslash-prefixed authority', '\\\\evil.example/'],
+    ['a mixed slash-backslash authority', '/\\evil.example'],
+    ['a tab-smuggled authority', '/\t/evil.example'],
+    ['a javascript: URL', 'javascript:alert(1)'],
+    ['a non-string value', 42],
+  ])('ignores %s in the redirect state and lands on the default profile page', async (_label, hostileFrom) => {
+    vi.mocked(globalThis.fetch).mockImplementation(() =>
+      Promise.resolve(jsonResponse(200, { expiresIn: 3600, message: 'success' })),
+    )
+
+    renderLogin(hostileFrom)
+    await submitLogin({ email: 'alex@example.com', password: 'secret123' })
+
+    expect(currentPath()).toBe('/profile')
     expect(screen.getByText('Profile page')).toBeInTheDocument()
   })
 

@@ -3,11 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { login } from '../api/auth';
 import { toFormError } from '../api/ApiError';
 import { useAuth } from '../auth/useAuth';
+import { resolveRedirectPath } from '../auth/redirect';
 import FieldError from '../components/FieldError';
-
-interface LoginRedirectState {
-  from?: string;
-}
 
 function Login() {
   const navigate = useNavigate();
@@ -19,8 +16,8 @@ function Login() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  const redirectState = location.state as LoginRedirectState | null;
-  const redirectTo = redirectState?.from ?? '/profile';
+  const redirectState = location.state as { from?: unknown } | null;
+  const redirectTo = resolveRedirectPath(redirectState?.from);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(classes = CookieProperties.class)
@@ -18,5 +19,11 @@ class ProdProfileProbeTest {
     void prodProfile_ActuallyLoadsApplicationProdProperties_AndForcesSecureCookies() {
         assertTrue(cookieProperties.isSecure(),
                 "application-prod.properties must set security.cookie.secure=true and must actually be loaded");
+    }
+
+    @Test
+    void prodProfile_ActuallyLoadsApplicationProdProperties_AndPinsTheSameSitePolicy() {
+        assertEquals("Lax", cookieProperties.getSameSite(),
+                "application-prod.properties must set security.cookie.same-site=Lax and must actually be loaded");
     }
 }
