@@ -8,26 +8,46 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
+import org.springframework.validation.annotation.Validated;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import hu.financial.model.Budget;
 import hu.financial.service.BudgetService;
 import hu.financial.service.UserService;
 import hu.financial.exception.budget.BudgetNotFoundException;
+import hu.financial.dto.budget.BudgetFilter;
 import hu.financial.dto.budget.CreateBudgetDto;
 import hu.financial.dto.budget.BudgetResponseDto;
+import hu.financial.dto.common.PageResponse;
+import hu.financial.web.SortWhitelist;
 import org.springframework.beans.factory.annotation.Autowired;
 import java.util.List;
-import java.util.stream.Collectors;
 
 
 @RestController
 @RequestMapping("/api/budgets")
+@Validated
 @Tag(name = "Budget", description = "Budgets Handler")
 public class BudgetController {
+
+    private static final String DEFAULT_PAGE = "0";
+
+    private static final String DEFAULT_SIZE = "20";
+
+    private static final String DEFAULT_SORT = "month,desc";
+
+    private static final SortWhitelist SORT_WHITELIST =
+            SortWhitelist.of(List.of("month", "amount", "id"), Sort.Order.desc("id"));
 
     @Autowired
     private BudgetService budgetService;
@@ -45,11 +65,17 @@ public class BudgetController {
 
     @Operation(summary = "Get the current user's budgets")
     @GetMapping
-    public ResponseEntity<List<BudgetResponseDto>> getMyBudgets() {
+    public ResponseEntity<PageResponse<BudgetResponseDto>> getMyBudgets(
+            @RequestParam(defaultValue = DEFAULT_PAGE) @Min(0) int page,
+            @RequestParam(defaultValue = DEFAULT_SIZE) @Min(1) @Max(100) int size,
+            @RequestParam(defaultValue = DEFAULT_SORT) String sort,
+            @RequestParam(required = false) String month,
+            @RequestParam(required = false) Long categoryId) {
+        Pageable pageable = PageRequest.of(page, size, SORT_WHITELIST.toSort(sort));
+        BudgetFilter filter = BudgetFilter.of(month, categoryId);
         Long userId = userService.getCurrentUser().getId();
-        List<BudgetResponseDto> budgets = budgetService.getBudgetsByUserId(userId)
-                .stream().map(budgetService::mapToDto).collect(Collectors.toList());
-        return ResponseEntity.ok(budgets);
+        Page<Budget> budgets = budgetService.getBudgetsByUserId(userId, filter, pageable);
+        return ResponseEntity.ok(PageResponse.from(budgets.map(budgetService::mapToDto)));
     }
 
     @Operation(summary = "Get one of the current user's budgets by id")

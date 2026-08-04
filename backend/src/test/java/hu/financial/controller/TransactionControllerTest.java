@@ -3,10 +3,18 @@ package hu.financial.controller;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
+import hu.financial.dto.common.PageResponse;
+import hu.financial.dto.transaction.TransactionFilter;
+import hu.financial.exception.InvalidRequestParameterException;
 import hu.financial.service.TransactionService;
 import hu.financial.service.UserService;
 import hu.financial.model.User;
@@ -82,19 +90,62 @@ public class TransactionControllerTest {
     }
 
     @Test
-    void getMyTransactions_ShouldReturnList_WhenValidUser() {
+    void getMyTransactions_ShouldReturnPageWrapper_WhenValidUser() {
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         when(userService.getCurrentUser()).thenReturn(testUser);
-        when(transactionService.getTransactionsByUserId(testUser.getId())).thenReturn(Arrays.asList(testTransaction));
+        when(transactionService.getTransactionsByUserId(eq(testUser.getId()), any(TransactionFilter.class),
+                any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Arrays.asList(testTransaction), PageRequest.of(0, 20), 1));
         when(transactionService.mapToDto(testTransaction)).thenReturn(transactionResponseDto);
 
-        ResponseEntity<List<TransactionResponseDto>> response = transactionController.getMyTransactions();
+        ResponseEntity<PageResponse<TransactionResponseDto>> response =
+                transactionController.getMyTransactions(0, 20, "date,desc", null, null, null, null);
 
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().size());
-        assertEquals(testTransaction.getId(), response.getBody().get(0).getId());
-        verify(transactionService).getTransactionsByUserId(testUser.getId());
+        assertEquals(1, response.getBody().content().size());
+        assertEquals(testTransaction.getId(), response.getBody().content().get(0).getId());
+        assertEquals(0, response.getBody().page());
+        assertEquals(20, response.getBody().size());
+        assertEquals(1, response.getBody().totalElements());
+        assertTrue(response.getBody().first());
+        assertTrue(response.getBody().last());
+        verify(transactionService).getTransactionsByUserId(eq(testUser.getId()), eq(TransactionFilter.unfiltered()),
+                pageable.capture());
+        assertEquals(Sort.by(Sort.Order.desc("date"), Sort.Order.desc("id")), pageable.getValue().getSort());
+    }
+
+    @Test
+    void getMyTransactions_ShouldPassEveryFilterToTheService() {
+        ArgumentCaptor<TransactionFilter> filter = ArgumentCaptor.forClass(TransactionFilter.class);
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(transactionService.getTransactionsByUserId(eq(testUser.getId()), any(TransactionFilter.class),
+                any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        transactionController.getMyTransactions(0, 20, "date,desc", LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 1, 31), 7L, TransactionType.EXPENSE);
+
+        verify(transactionService).getTransactionsByUserId(eq(testUser.getId()), filter.capture(),
+                any(Pageable.class));
+        assertEquals(new TransactionFilter(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), 7L,
+                TransactionType.EXPENSE), filter.getValue());
+    }
+
+    @Test
+    void getMyTransactions_ShouldRejectUnknownSortField_WithoutTouchingTheService() {
+        assertThrows(InvalidRequestParameterException.class,
+                () -> transactionController.getMyTransactions(0, 20, "password", null, null, null, null));
+        verify(transactionService, never()).getTransactionsByUserId(any(), any(), any());
+    }
+
+    @Test
+    void getMyTransactions_ShouldRejectInvertedDateRange_WithoutTouchingTheService() {
+        assertThrows(InvalidRequestParameterException.class,
+                () -> transactionController.getMyTransactions(0, 20, "date,desc", LocalDate.of(2026, 2, 1),
+                        LocalDate.of(2026, 1, 31), null, null));
+        verify(transactionService, never()).getTransactionsByUserId(any(), any(), any());
     }
 
     @Test

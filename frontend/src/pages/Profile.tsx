@@ -1,6 +1,6 @@
 import { useState, type SyntheticEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ProfileSidebar from '../components/ProfileSidebar';
+import ProfileSidebar, { type ProfileTab } from '../components/ProfileSidebar';
 import CategoriesTab from '../components/CategoriesTab';
 import ChangePasswordForm from '../components/ChangePasswordForm';
 import TransactionsPlaceholder from '../components/TransactionsPlaceholder';
@@ -9,8 +9,6 @@ import { deleteAccount, updateProfile } from '../api/users';
 import { toFormError } from '../api/ApiError';
 import { useAuth } from '../auth/useAuth';
 import type { UpdateProfileDto } from '../api/types';
-
-type ProfileTab = 'profile' | 'transactions' | 'categories';
 
 function formatDate(value: string | null): string {
   return value ? new Date(value).toLocaleDateString() : 'Unknown';

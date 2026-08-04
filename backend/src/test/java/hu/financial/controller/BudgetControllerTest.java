@@ -3,17 +3,25 @@ package hu.financial.controller;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import hu.financial.service.BudgetService;
 import hu.financial.service.UserService;
 import hu.financial.model.User;
 import hu.financial.model.Category;
 import hu.financial.model.Budget;
+import hu.financial.dto.budget.BudgetFilter;
 import hu.financial.dto.budget.CreateBudgetDto;
 import hu.financial.dto.budget.BudgetResponseDto;
+import hu.financial.dto.common.PageResponse;
+import hu.financial.exception.InvalidRequestParameterException;
 import hu.financial.exception.budget.BudgetNotFoundException;
 import hu.financial.exception.category.CategoryNotFoundException;
 
@@ -26,6 +34,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.Arrays;
 import java.util.List;
 
@@ -79,19 +88,56 @@ public class BudgetControllerTest {
     }
 
     @Test
-    void getMyBudgets_ShouldReturnList_WhenValidUser() {
+    void getMyBudgets_ShouldReturnPageWrapper_WhenValidUser() {
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         when(userService.getCurrentUser()).thenReturn(testUser);
-        when(budgetService.getBudgetsByUserId(testUser.getId())).thenReturn(Arrays.asList(testBudget));
+        when(budgetService.getBudgetsByUserId(eq(testUser.getId()), any(BudgetFilter.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Arrays.asList(testBudget), PageRequest.of(0, 20), 1));
         when(budgetService.mapToDto(testBudget)).thenReturn(budgetResponseDto);
 
-        ResponseEntity<List<BudgetResponseDto>> response = budgetController.getMyBudgets();
+        ResponseEntity<PageResponse<BudgetResponseDto>> response =
+                budgetController.getMyBudgets(0, 20, "month,desc", null, null);
 
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(1, response.getBody().size());
-        assertEquals(testBudget.getId(), response.getBody().get(0).getId());
-        verify(budgetService).getBudgetsByUserId(testUser.getId());
+        assertEquals(1, response.getBody().content().size());
+        assertEquals(testBudget.getId(), response.getBody().content().get(0).getId());
+        assertEquals(0, response.getBody().page());
+        assertEquals(20, response.getBody().size());
+        assertEquals(1, response.getBody().totalElements());
+        assertTrue(response.getBody().first());
+        assertTrue(response.getBody().last());
+        verify(budgetService).getBudgetsByUserId(eq(testUser.getId()), eq(BudgetFilter.unfiltered()),
+                pageable.capture());
+        assertEquals(Sort.by(Sort.Order.desc("month"), Sort.Order.desc("id")), pageable.getValue().getSort());
+    }
+
+    @Test
+    void getMyBudgets_ShouldPassMonthAndCategoryFiltersToTheService() {
+        ArgumentCaptor<BudgetFilter> filter = ArgumentCaptor.forClass(BudgetFilter.class);
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(budgetService.getBudgetsByUserId(eq(testUser.getId()), any(BudgetFilter.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        budgetController.getMyBudgets(0, 20, "month,desc", "2026-02", 7L);
+
+        verify(budgetService).getBudgetsByUserId(eq(testUser.getId()), filter.capture(), any(Pageable.class));
+        assertEquals(new BudgetFilter(YearMonth.of(2026, 2), 7L), filter.getValue());
+    }
+
+    @Test
+    void getMyBudgets_ShouldRejectUnknownSortField_WithoutTouchingTheService() {
+        assertThrows(InvalidRequestParameterException.class,
+                () -> budgetController.getMyBudgets(0, 20, "user", null, null));
+        verify(budgetService, never()).getBudgetsByUserId(any(), any(), any());
+    }
+
+    @Test
+    void getMyBudgets_ShouldRejectMalformedMonth_WithoutTouchingTheService() {
+        assertThrows(InvalidRequestParameterException.class,
+                () -> budgetController.getMyBudgets(0, 20, "month,desc", "2026-02-01", null));
+        verify(budgetService, never()).getBudgetsByUserId(any(), any(), any());
     }
 
     @Test

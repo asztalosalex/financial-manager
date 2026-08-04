@@ -52,6 +52,16 @@ export interface CreateCategoryDto {
   description: string
 }
 
+export interface PageResponse<T> {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  first: boolean
+  last: boolean
+}
+
 export type TransactionType = 'INCOME' | 'EXPENSE'
 
 export interface TransactionResponseDto {
@@ -60,7 +70,7 @@ export interface TransactionResponseDto {
   description: string | null
   categoryId: number
   categoryName: string
-  amount: string
+  amount: number
   date: string
 }
 
@@ -68,20 +78,41 @@ export interface CreateTransactionDto {
   type: TransactionType
   description?: string
   categoryId: number
-  amount: string
+  amount: number
   date: string
 }
 
 export interface BudgetResponseDto {
   id: number
-  amount: string
+  amount: number
   month: string
   categoryId: number
   categoryName: string
 }
 
 export interface CreateBudgetDto {
-  amount: string
+  amount: number
   month: string
   categoryId: number
+}
+
+export interface ReportMetric {
+  current: number
+  previous: number
+  deltaPercent: number | null
+}
+
+export interface SavingsRateMetric {
+  current: number | null
+  previous: number | null
+  deltaPoints: number | null
+}
+
+export interface ReportsSummaryResponse {
+  month: string
+  previousMonth: string
+  balance: ReportMetric
+  income: ReportMetric
+  expense: ReportMetric
+  savingsRate: SavingsRateMetric
 }

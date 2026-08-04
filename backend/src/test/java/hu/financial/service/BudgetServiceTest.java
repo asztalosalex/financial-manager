@@ -4,17 +4,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentMatchers;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import hu.financial.repository.BudgetRepository;
 import hu.financial.model.Budget;
 import hu.financial.model.User;
 import hu.financial.model.Category;
+import hu.financial.dto.budget.BudgetFilter;
 import hu.financial.dto.budget.CreateBudgetDto;
 import hu.financial.exception.budget.BudgetNotFoundException;
 import hu.financial.exception.budget.BudgetValidationException;
 import hu.financial.exception.category.CategoryNotFoundException;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import org.junit.jupiter.api.BeforeEach;
 import java.math.BigDecimal;
@@ -80,13 +89,18 @@ public class BudgetServiceTest {
     }
 
     @Test
-    void getBudgetsByUserId_ShouldReturnList_WhenBudgetsExist() {
-        when(budgetRepository.findByUserId(testUser.getId())).thenReturn(Arrays.asList(testBudget));
+    void getBudgetsByUserId_ShouldDelegateSpecificationAndPageableToRepository_SoFilteringHappensInSql() {
+        Pageable pageable = PageRequest.of(1, 5, Sort.by(Sort.Direction.DESC, "month"));
+        when(budgetRepository.findAll(ArgumentMatchers.<Specification<Budget>>any(), eq(pageable)))
+                .thenReturn(new PageImpl<>(Arrays.asList(testBudget), pageable, 11));
 
-        List<Budget> result = budgetService.getBudgetsByUserId(testUser.getId());
+        Page<Budget> result = budgetService.getBudgetsByUserId(
+                testUser.getId(), BudgetFilter.unfiltered(), pageable);
 
-        assertEquals(Arrays.asList(testBudget), result);
-        verify(budgetRepository).findByUserId(testUser.getId());
+        assertEquals(Arrays.asList(testBudget), result.getContent());
+        assertEquals(11, result.getTotalElements());
+        verify(budgetRepository).findAll(ArgumentMatchers.<Specification<Budget>>any(), eq(pageable));
+        verify(budgetRepository, never()).findAll(any(Pageable.class));
     }
 
     @Test

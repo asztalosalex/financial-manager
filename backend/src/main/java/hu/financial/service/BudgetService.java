@@ -1,13 +1,17 @@
 package hu.financial.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import hu.financial.repository.BudgetRepository;
+import hu.financial.repository.spec.BudgetSpecifications;
 import hu.financial.model.Budget;
 import hu.financial.model.User;
 import hu.financial.exception.budget.BudgetNotFoundException;
 import hu.financial.exception.budget.BudgetValidationException;
+import hu.financial.dto.budget.BudgetFilter;
 import hu.financial.dto.budget.CreateBudgetDto;
 import hu.financial.dto.budget.BudgetResponseDto;
 import java.math.BigDecimal;
@@ -37,8 +41,8 @@ public class BudgetService {
         return budgetRepository.findAll();
     }
 
-    public List<Budget> getBudgetsByUserId(Long userId) {
-        return budgetRepository.findByUserId(userId);
+    public Page<Budget> getBudgetsByUserId(Long userId, BudgetFilter filter, Pageable pageable) {
+        return budgetRepository.findAll(BudgetSpecifications.ownedBy(userId, filter), pageable);
     }
     
     public Budget getBudgetById(Long id) {

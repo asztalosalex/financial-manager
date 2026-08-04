@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import {
   createCategory,
   deleteCategory,
@@ -7,22 +7,23 @@ import {
 } from '../api/categories';
 import { isAbortError, toFormError } from '../api/ApiError';
 import FieldError from './FieldError';
+import type { CategoryResponseDto, CreateCategoryDto } from '../api/types';
 
-const EMPTY_FORM = { name: '', description: '' };
+const EMPTY_FORM: CreateCategoryDto = { name: '', description: '' };
 
 function CategoriesTab() {
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState<CategoryResponseDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingCategory, setEditingCategory] = useState(null);
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [editingCategory, setEditingCategory] = useState<CategoryResponseDto | null>(null);
+  const [formData, setFormData] = useState<CreateCategoryDto>(EMPTY_FORM);
   const [formError, setFormError] = useState('');
-  const [formFieldErrors, setFormFieldErrors] = useState({});
+  const [formFieldErrors, setFormFieldErrors] = useState<Record<string, string>>({});
   const [formSuccess, setFormSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const loadCategories = useCallback(async (signal) => {
+  const loadCategories = useCallback(async (signal: AbortSignal) => {
     try {
       const data = await fetchCategories(signal);
       setCategories(data);
@@ -39,11 +40,11 @@ function CategoriesTab() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadCategories(controller.signal);
+    void loadCategories(controller.signal);
     return () => controller.abort();
   }, [loadCategories]);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setFormError('');
@@ -57,7 +58,7 @@ function CategoriesTab() {
     setEditingCategory(null);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError('');
     setFormFieldErrors({});
@@ -89,7 +90,7 @@ function CategoriesTab() {
     }
   };
 
-  const handleEdit = (category) => {
+  const handleEdit = (category: CategoryResponseDto) => {
     setEditingCategory(category);
     setFormData({ name: category.name, description: category.description });
     setFormError('');
@@ -97,7 +98,7 @@ function CategoriesTab() {
     setShowCreateForm(true);
   };
 
-  const handleDelete = async (categoryId) => {
+  const handleDelete = async (categoryId: number) => {
     if (!window.confirm('Are you sure you want to delete this category?')) {
       return;
     }
@@ -161,7 +162,7 @@ function CategoriesTab() {
                 value={formData.description}
                 onChange={handleInputChange}
                 placeholder="Enter category description"
-                rows="3"
+                rows={3}
                 aria-invalid={Boolean(formFieldErrors.description)}
                 required
               />

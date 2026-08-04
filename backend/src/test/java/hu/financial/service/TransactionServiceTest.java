@@ -4,14 +4,23 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentMatchers;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import hu.financial.repository.TransactionRepository;
 import hu.financial.model.Transaction;
 import hu.financial.model.User;
 import hu.financial.model.Category;
 import hu.financial.dto.transaction.CreateTransactionDto;
+import hu.financial.dto.transaction.TransactionFilter;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import org.junit.jupiter.api.BeforeEach;
 import java.math.BigDecimal;
@@ -126,17 +135,21 @@ public class TransactionServiceTest {
     }
 
     @Test
-    void getTransactionsByUserId_ShouldReturnListOfTransactions_WhenTransactionsExist() {
-        // Arrange
-        when(transactionRepository.findByUserId(testUser.getId())).thenReturn(Arrays.asList(testTransaction));
+    void getTransactionsByUserId_ShouldDelegateSpecificationAndPageableToRepository_SoFilteringHappensInSql() {
+        Pageable pageable = PageRequest.of(1, 5, Sort.by(Sort.Direction.DESC, "date"));
+        Page<Transaction> page = new PageImpl<>(Arrays.asList(testTransaction), pageable, 11);
+        when(transactionRepository.findAll(ArgumentMatchers.<Specification<Transaction>>any(), eq(pageable)))
+                .thenReturn(page);
 
-        // Act
-        List<Transaction> result = transactionService.getTransactionsByUserId(testUser.getId());
+        Page<Transaction> result = transactionService.getTransactionsByUserId(
+                testUser.getId(), TransactionFilter.unfiltered(), pageable);
 
-        // Assert
         assertNotNull(result);
-        assertEquals(Arrays.asList(testTransaction), result);
-        verify(transactionRepository, times(1)).findByUserId(testUser.getId());
+        assertEquals(Arrays.asList(testTransaction), result.getContent());
+        assertEquals(11, result.getTotalElements());
+        verify(transactionRepository, times(1))
+                .findAll(ArgumentMatchers.<Specification<Transaction>>any(), eq(pageable));
+        verify(transactionRepository, never()).findAll(any(Pageable.class));
     }
 
     @Test

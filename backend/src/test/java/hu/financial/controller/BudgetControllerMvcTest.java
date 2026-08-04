@@ -21,10 +21,15 @@ import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
@@ -90,6 +95,8 @@ class BudgetControllerMvcTest {
 
     private User currentUser;
 
+    private Budget ownBudget;
+
     @BeforeEach
     void setUp() {
         currentUser = new User("testuser", "encoded-password", "test@example.com");
@@ -104,7 +111,7 @@ class BudgetControllerMvcTest {
         Category foreignCategory = new Category("foreign", "not yours", otherUser);
         foreignCategory.setId(FOREIGN_CATEGORY_ID);
 
-        Budget ownBudget = new Budget(OWN_BUDGET_ID, new BigDecimal("100.00"), LocalDate.of(2026, 1, 1),
+        ownBudget = new Budget(OWN_BUDGET_ID, new BigDecimal("100.00"), LocalDate.of(2026, 1, 1),
                 currentUser, ownCategory);
         Budget foreignBudget = new Budget(FOREIGN_BUDGET_ID, new BigDecimal("50.00"), LocalDate.of(2026, 1, 1),
                 otherUser, foreignCategory);
@@ -119,7 +126,8 @@ class BudgetControllerMvcTest {
         when(budgetRepository.findById(OWN_BUDGET_ID)).thenReturn(Optional.of(ownBudget));
         when(budgetRepository.findById(FOREIGN_BUDGET_ID)).thenReturn(Optional.of(foreignBudget));
         when(budgetRepository.findById(UNKNOWN_BUDGET_ID)).thenReturn(Optional.empty());
-        when(budgetRepository.findByUserId(currentUser.getId())).thenReturn(List.of());
+        when(budgetRepository.findAll(anySpecification(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<Budget>(List.of(), invocation.getArgument(1), 0));
         when(budgetRepository.save(any(Budget.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -138,6 +146,169 @@ class BudgetControllerMvcTest {
 
     private String json(Object body) throws Exception {
         return objectMapper.writeValueAsString(body);
+    }
+
+    private static Specification<Budget> anySpecification() {
+        return ArgumentMatchers.any();
+    }
+
+    private Pageable capturedPageable() {
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(budgetRepository).findAll(anySpecification(), pageable.capture());
+        return pageable.getValue();
+    }
+
+    @Test
+    void getMyBudgets_ReturnsPageWrapper_NotABareArray() throws Exception {
+        when(budgetRepository.findAll(anySpecification(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(ownBudget), invocation.getArgument(1), 1));
+
+        mockMvc.perform(get("/api/budgets").cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(OWN_BUDGET_ID))
+                .andExpect(jsonPath("$.content[0].amount").value(100.00))
+                .andExpect(jsonPath("$.content[0].month").value("2026-01-01"))
+                .andExpect(jsonPath("$.content[0].categoryId").value(OWN_CATEGORY_ID))
+                .andExpect(jsonPath("$.content[0].categoryName").value("groceries"))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.last").value(true));
+    }
+
+    @Test
+    void getMyBudgets_WithoutParameters_UsesPageZeroSizeTwentyAndMonthDescending() throws Exception {
+        mockMvc.perform(get("/api/budgets").cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(0));
+
+        Pageable pageable = capturedPageable();
+        assertEquals(0, pageable.getPageNumber());
+        assertEquals(20, pageable.getPageSize());
+        assertEquals(Sort.by(Sort.Order.desc("month"), Sort.Order.desc("id")), pageable.getSort());
+    }
+
+    @Test
+    void getMyBudgets_MiddlePage_ReportsTotalsAndBoundaryFlags() throws Exception {
+        when(budgetRepository.findAll(anySpecification(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(ownBudget), invocation.getArgument(1), 137));
+
+        mockMvc.perform(get("/api/budgets").param("page", "1").param("size", "20").cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(137))
+                .andExpect(jsonPath("$.totalPages").value(7))
+                .andExpect(jsonPath("$.first").value(false))
+                .andExpect(jsonPath("$.last").value(false));
+    }
+
+    @Test
+    void getMyBudgets_SortByAmount_AlwaysAppendsIdDescendingSoPagesDoNotOverlap() throws Exception {
+        mockMvc.perform(get("/api/budgets").param("sort", "amount,asc").cookie(authCookie()))
+                .andExpect(status().isOk());
+
+        assertEquals(Sort.by(Sort.Order.asc("amount"), Sort.Order.desc("id")), capturedPageable().getSort());
+    }
+
+    @Test
+    void getMyBudgets_SortById_StaysSingleKeyBecauseIdIsAlreadyUnique() throws Exception {
+        mockMvc.perform(get("/api/budgets").param("sort", "id,asc").cookie(authCookie()))
+                .andExpect(status().isOk());
+
+        assertEquals(Sort.by(Sort.Order.asc("id")), capturedPageable().getSort());
+    }
+
+    @Test
+    void getMyBudgets_UnknownSortField_Returns400WithSortFieldErrorAndNoQuery() throws Exception {
+        mockMvc.perform(get("/api/budgets").param("sort", "date").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.sort").exists());
+
+        verify(budgetRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyBudgets_SizeAboveHundred_Returns400WithUnprefixedSizeFieldError() throws Exception {
+        mockMvc.perform(get("/api/budgets").param("size", "101").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.size").exists())
+                .andExpect(jsonPath("$.fieldErrors['getMyBudgets.size']").doesNotExist());
+
+        verify(budgetRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyBudgets_NegativePage_Returns400WithPageFieldError() throws Exception {
+        mockMvc.perform(get("/api/budgets").param("page", "-1").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.page").exists());
+
+        verify(budgetRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyBudgets_WithMonthAndCategoryFilters_IsAcceptedAndQueriesOncePerRequest() throws Exception {
+        mockMvc.perform(get("/api/budgets")
+                .param("month", "2026-01")
+                .param("categoryId", String.valueOf(OWN_CATEGORY_ID))
+                .cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+
+        verify(budgetRepository).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyBudgets_ForeignCategoryIdFilter_IsNotAnError() throws Exception {
+        mockMvc.perform(get("/api/budgets")
+                .param("categoryId", String.valueOf(FOREIGN_CATEGORY_ID))
+                .cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void getMyBudgets_MalformedMonth_Returns400WithMonthFieldError() throws Exception {
+        mockMvc.perform(get("/api/budgets").param("month", "2026-01-01").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.month").exists());
+
+        verify(budgetRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyBudgets_NonNumericCategoryId_Returns400WithCategoryIdFieldError() throws Exception {
+        mockMvc.perform(get("/api/budgets").param("categoryId", "abc").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.categoryId").exists());
+
+        verify(budgetRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyBudgets_WithoutAuthCookie_Returns401() throws Exception {
+        mockMvc.perform(get("/api/budgets"))
+                .andExpect(status().isUnauthorized());
+
+        verify(budgetRepository, never()).findAll(anySpecification(), any(Pageable.class));
     }
 
     @Test
@@ -263,7 +434,7 @@ class BudgetControllerMvcTest {
 
     @Test
     void unexpectedFailure_Returns500_WithoutLeakingInternalDetail() throws Exception {
-        when(budgetRepository.findByUserId(currentUser.getId())).thenThrow(new IllegalStateException(
+        when(budgetRepository.findAll(anySpecification(), any(Pageable.class))).thenThrow(new IllegalStateException(
                 "ERROR: duplicate key value violates unique constraint \"uk_budgets_user_category\""));
 
         mockMvc.perform(get("/api/budgets").cookie(authCookie()))

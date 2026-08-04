@@ -101,11 +101,33 @@ class UserControllerMvcTest {
         return cookie;
     }
 
+    private Cookie anonymousCsrfCookie() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/users/count"))
+                .andExpect(status().isOk())
+                .andReturn();
+        Cookie cookie = result.getResponse().getCookie("XSRF-TOKEN");
+        assertNotNull(cookie, "an anonymous request must also receive an XSRF-TOKEN cookie");
+        return cookie;
+    }
+
     @Test
     void getProfile_WithoutAuthCookie_Returns401AndEmptyBody() throws Exception {
         mockMvc.perform(get("/api/users/profile"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().string(""));
+    }
+
+    @Test
+    void getProfile_Returns401_ButStillIssuesAReadableCsrfCookie_SoALoggedOutVisitorCanPost() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/users/profile"))
+                .andExpect(status().isUnauthorized())
+                .andReturn();
+
+        Cookie csrf = result.getResponse().getCookie("XSRF-TOKEN");
+        assertNotNull(csrf, "the mount-time profile probe is where a cold browser gets its CSRF token");
+        org.junit.jupiter.api.Assertions.assertFalse(csrf.isHttpOnly(), "the SPA has to read XSRF-TOKEN from JS");
+        org.junit.jupiter.api.Assertions.assertNotNull(csrf.getValue());
+        org.junit.jupiter.api.Assertions.assertFalse(csrf.getValue().isBlank());
     }
 
     @Test
@@ -210,6 +232,60 @@ class UserControllerMvcTest {
                 .content(objectMapper.writeValueAsString(new UpdateProfileDto("testuser", "test@example.com"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("testuser"));
+    }
+
+    @Test
+    void updateUser_WithoutAuthCookie_Returns401AndEmptyBody() throws Exception {
+        Cookie csrf = anonymousCsrfCookie();
+
+        mockMvc.perform(put("/api/users/{id}", OWN_ID)
+                .cookie(csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new UpdateProfileDto("testuser", "test@example.com"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string(""));
+
+        verify(userService, never()).updateUser(any(), any());
+    }
+
+    @Test
+    void updateUser_WithMalformedAuthCookie_Returns401() throws Exception {
+        Cookie csrf = anonymousCsrfCookie();
+
+        mockMvc.perform(put("/api/users/{id}", OWN_ID)
+                .cookie(new Cookie("authToken", "not.a.jwt"), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new UpdateProfileDto("testuser", "test@example.com"))))
+                .andExpect(status().isUnauthorized());
+
+        verify(userService, never()).updateUser(any(), any());
+    }
+
+    @Test
+    void deleteUser_WithoutAuthCookie_Returns401AndEmptyBody() throws Exception {
+        Cookie csrf = anonymousCsrfCookie();
+
+        mockMvc.perform(delete("/api/users/{id}", OWN_ID)
+                .cookie(csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string(""));
+
+        verify(userService, never()).deleteUser(any());
+    }
+
+    @Test
+    void deleteUser_WithMalformedAuthCookie_Returns401() throws Exception {
+        Cookie csrf = anonymousCsrfCookie();
+
+        mockMvc.perform(delete("/api/users/{id}", OWN_ID)
+                .cookie(new Cookie("authToken", "not.a.jwt"), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue()))
+                .andExpect(status().isUnauthorized());
+
+        verify(userService, never()).deleteUser(any());
     }
 
     @Test

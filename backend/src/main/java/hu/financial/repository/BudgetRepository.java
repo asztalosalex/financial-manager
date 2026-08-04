@@ -1,14 +1,12 @@
 package hu.financial.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import hu.financial.model.Budget;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
-import java.util.List;
+
+import hu.financial.model.Budget;
 
 @Repository
-public interface BudgetRepository extends JpaRepository<Budget, Long> {
-
-    List<Budget> findByUserId(Long userId);
+public interface BudgetRepository extends JpaRepository<Budget, Long>, JpaSpecificationExecutor<Budget> {
 
 }
-

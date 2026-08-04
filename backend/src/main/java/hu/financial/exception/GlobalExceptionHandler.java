@@ -103,13 +103,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatch(
             MethodArgumentTypeMismatchException ex, WebRequest request) {
+        String message = "Parameter '" + ex.getName() + "' should be of type " + requiredTypeName(ex);
         ErrorResponse errorResponse = new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
                 "Type Mismatch",
-                "Parameter '" + ex.getName() + "' should be of type " + ex.getRequiredType().getSimpleName(),
-                request.getDescription(false)
+                message,
+                request.getDescription(false),
+                Map.of(ex.getName(), message)
         );
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    private static String requiredTypeName(MethodArgumentTypeMismatchException ex) {
+        return ex.getRequiredType() == null ? "a supported type" : ex.getRequiredType().getSimpleName();
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -117,13 +123,13 @@ public class GlobalExceptionHandler {
             ConstraintViolationException ex, WebRequest request) {
         String errors = ex.getConstraintViolations()
                 .stream()
-                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+                .map(violation -> parameterName(violation) + ": " + violation.getMessage())
                 .collect(Collectors.joining(", "));
 
         Map<String, String> fieldErrors = ex.getConstraintViolations()
                 .stream()
                 .collect(Collectors.toMap(
-                        violation -> violation.getPropertyPath().toString(),
+                        GlobalExceptionHandler::parameterName,
                         ConstraintViolation::getMessage,
                         (first, second) -> first,
                         LinkedHashMap::new));
@@ -134,6 +140,25 @@ public class GlobalExceptionHandler {
                 errors,
                 request.getDescription(false),
                 fieldErrors
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    private static String parameterName(ConstraintViolation<?> violation) {
+        String propertyPath = violation.getPropertyPath().toString();
+        int lastSeparator = propertyPath.lastIndexOf('.');
+        return lastSeparator < 0 ? propertyPath : propertyPath.substring(lastSeparator + 1);
+    }
+
+    @ExceptionHandler(InvalidRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRequestParameter(
+            InvalidRequestParameterException ex, WebRequest request) {
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "Validation Error",
+                ex.getParameter() + ": " + ex.getMessage(),
+                request.getDescription(false),
+                Map.of(ex.getParameter(), ex.getMessage())
         );
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }

@@ -1,26 +1,28 @@
 import { Link, NavLink } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Logo from './Logo'
 import { useAuth } from '../auth/useAuth'
 
 function Header() {
-  const { isAuthenticated, isLoading, logout } = useAuth()
+  const { isAuthenticated, isLoading, logout, clearSession } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
 
   const closeMenu = () => setMenuOpen(false)
 
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     closeMenu()
     setLoggingOut(true)
     try {
       await logout()
+    } catch {
+      clearSession()
     } finally {
       setLoggingOut(false)
     }
   }
 
-  const renderAuthActions = () => {
+  const renderAuthActions = (): ReactNode => {
     if (isLoading) {
       return <span className="nav-link" aria-live="polite">Loading...</span>
     }

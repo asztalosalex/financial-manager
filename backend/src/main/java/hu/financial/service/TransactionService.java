@@ -3,10 +3,14 @@ package hu.financial.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import hu.financial.repository.TransactionRepository;
+import hu.financial.repository.spec.TransactionSpecifications;
+import hu.financial.dto.transaction.TransactionFilter;
 import hu.financial.model.Transaction;
 import hu.financial.model.User;
 import hu.financial.exception.transaction.TransactionNotFoundException;
@@ -68,8 +72,8 @@ public class TransactionService {
     }
   }
 
-  public List<Transaction> getTransactionsByUserId(Long userId) {
-    return transactionRepository.findByUserId(userId);
+  public Page<Transaction> getTransactionsByUserId(Long userId, TransactionFilter filter, Pageable pageable) {
+    return transactionRepository.findAll(TransactionSpecifications.ownedBy(userId, filter), pageable);
   }
 
   @Transactional

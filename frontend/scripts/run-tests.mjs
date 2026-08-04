@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 
 const startedAt = Date.now()
 
-const MINIMUM_TEST_FILES = 9
-const MINIMUM_TESTS = 65
+const MINIMUM_TEST_FILES = 14
+const MINIMUM_TESTS = 156
 
 const reportPath = fileURLToPath(new URL('../test-results.json', import.meta.url))
 const vitestBin = fileURLToPath(

@@ -1,5 +1,19 @@
-function ProfileSidebar({ activeTab, onTabChange, onLogout }) {
-  const menuItems = [
+export type ProfileTab = 'profile' | 'transactions' | 'categories';
+
+interface ProfileSidebarProps {
+  activeTab: ProfileTab;
+  onTabChange: (tab: ProfileTab) => void;
+  onLogout: () => void;
+}
+
+interface MenuItem {
+  id: ProfileTab;
+  label: string;
+  icon: string;
+}
+
+function ProfileSidebar({ activeTab, onTabChange, onLogout }: ProfileSidebarProps) {
+  const menuItems: MenuItem[] = [
     { id: 'profile', label: 'Profile Data', icon: '👤' },
     { id: 'transactions', label: 'Income & Expenses', icon: '💰' },
     { id: 'categories', label: 'Categories', icon: '📂' }

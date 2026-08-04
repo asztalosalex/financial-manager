@@ -22,10 +22,15 @@ import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
@@ -89,6 +94,8 @@ class TransactionControllerMvcTest {
 
     private User currentUser;
 
+    private Transaction ownTransaction;
+
     @BeforeEach
     void setUp() {
         currentUser = new User("testuser", "encoded-password", "test@example.com");
@@ -103,7 +110,7 @@ class TransactionControllerMvcTest {
         Category foreignCategory = new Category("foreign", "not yours", otherUser);
         foreignCategory.setId(FOREIGN_CATEGORY_ID);
 
-        Transaction ownTransaction = new Transaction(OWN_TRANSACTION_ID, TransactionType.EXPENSE, "weekly shopping",
+        ownTransaction = new Transaction(OWN_TRANSACTION_ID, TransactionType.EXPENSE, "weekly shopping",
                 ownCategory, currentUser, new BigDecimal("100.00"), LocalDate.of(2026, 1, 1));
         Transaction foreignTransaction = new Transaction(FOREIGN_TRANSACTION_ID, TransactionType.EXPENSE, "not yours",
                 foreignCategory, otherUser, new BigDecimal("50.00"), LocalDate.of(2026, 1, 1));
@@ -118,7 +125,8 @@ class TransactionControllerMvcTest {
         when(transactionRepository.findById(OWN_TRANSACTION_ID)).thenReturn(Optional.of(ownTransaction));
         when(transactionRepository.findById(FOREIGN_TRANSACTION_ID)).thenReturn(Optional.of(foreignTransaction));
         when(transactionRepository.findById(UNKNOWN_TRANSACTION_ID)).thenReturn(Optional.empty());
-        when(transactionRepository.findByUserId(currentUser.getId())).thenReturn(List.of());
+        when(transactionRepository.findAll(anySpecification(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<Transaction>(List.of(), invocation.getArgument(1), 0));
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -266,6 +274,259 @@ class TransactionControllerMvcTest {
         verify(transactionRepository, never()).save(any(Transaction.class));
     }
 
+    private static Specification<Transaction> anySpecification() {
+        return ArgumentMatchers.any();
+    }
+
+    private Pageable capturedPageable() {
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(transactionRepository).findAll(anySpecification(), pageable.capture());
+        return pageable.getValue();
+    }
+
+    @Test
+    void getMyTransactions_ReturnsOwnPageWrapper_NotABareArray() throws Exception {
+        when(transactionRepository.findAll(anySpecification(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(ownTransaction), invocation.getArgument(1), 1));
+
+        mockMvc.perform(get("/api/transactions").cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(OWN_TRANSACTION_ID))
+                .andExpect(jsonPath("$.content[0].categoryId").value(OWN_CATEGORY_ID))
+                .andExpect(jsonPath("$.content[0].categoryName").value("groceries"))
+                .andExpect(jsonPath("$.content[0].amount").value(100.00))
+                .andExpect(jsonPath("$.content[0].date").value("2026-01-01"))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.last").value(true));
+    }
+
+    @Test
+    void getMyTransactions_WithoutParameters_UsesPageZeroSizeTwentyAndDateDescending() throws Exception {
+        mockMvc.perform(get("/api/transactions").cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(0));
+
+        Pageable pageable = capturedPageable();
+        assertEquals(0, pageable.getPageNumber());
+        assertEquals(20, pageable.getPageSize());
+        assertEquals(Sort.by(Sort.Order.desc("date"), Sort.Order.desc("id")), pageable.getSort());
+    }
+
+    @Test
+    void getMyTransactions_EmptyPage_HasEmptyContentArrayNotNull() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("page", "3").cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(0));
+    }
+
+    @Test
+    void getMyTransactions_MiddlePage_ReportsTotalsAndBoundaryFlags() throws Exception {
+        when(transactionRepository.findAll(anySpecification(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(ownTransaction), invocation.getArgument(1), 137));
+
+        mockMvc.perform(get("/api/transactions")
+                .param("page", "1")
+                .param("size", "20")
+                .cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(137))
+                .andExpect(jsonPath("$.totalPages").value(7))
+                .andExpect(jsonPath("$.first").value(false))
+                .andExpect(jsonPath("$.last").value(false));
+
+        assertEquals(1, capturedPageable().getPageNumber());
+    }
+
+    @Test
+    void getMyTransactions_SortByAmount_AlwaysAppendsIdDescendingSoPagesDoNotOverlap() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("sort", "amount,asc").cookie(authCookie()))
+                .andExpect(status().isOk());
+
+        assertEquals(Sort.by(Sort.Order.asc("amount"), Sort.Order.desc("id")), capturedPageable().getSort());
+    }
+
+    @Test
+    void getMyTransactions_SortById_StaysSingleKeyBecauseIdIsAlreadyUnique() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("sort", "id,asc").cookie(authCookie()))
+                .andExpect(status().isOk());
+
+        assertEquals(Sort.by(Sort.Order.asc("id")), capturedPageable().getSort());
+    }
+
+    @Test
+    void getMyTransactions_UnknownSortField_Returns400WithSortFieldErrorAndNoQuery() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("sort", "user.password").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.sort").exists());
+
+        verify(transactionRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_UnknownSortDirection_Returns400WithSortFieldError() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("sort", "date,sideways").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.sort").exists());
+
+        verify(transactionRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_SizeAboveHundred_Returns400WithUnprefixedSizeFieldError() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("size", "101").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.size").exists())
+                .andExpect(jsonPath("$.fieldErrors['getMyTransactions.size']").doesNotExist());
+
+        verify(transactionRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_SizeBelowOne_Returns400WithSizeFieldError() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("size", "0").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.size").exists());
+
+        verify(transactionRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_NegativePage_Returns400WithPageFieldError() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("page", "-1").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.page").exists())
+                .andExpect(jsonPath("$.fieldErrors['getMyTransactions.page']").doesNotExist());
+
+        verify(transactionRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_SizeAtHundred_IsAccepted() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("size", "100").cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(100));
+
+        assertEquals(100, capturedPageable().getPageSize());
+    }
+
+    @Test
+    void getMyTransactions_IgnoresUserIdParameter_BecauseTheScopeComesFromTheSession() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("userId", "2").cookie(authCookie()))
+                .andExpect(status().isOk());
+
+        verify(userService).getCurrentUser();
+        verify(transactionRepository).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_WithEveryFilter_IsAcceptedAndStillQueriesOncePerRequest() throws Exception {
+        mockMvc.perform(get("/api/transactions")
+                .param("from", "2026-01-01")
+                .param("to", "2026-01-31")
+                .param("categoryId", String.valueOf(OWN_CATEGORY_ID))
+                .param("type", "EXPENSE")
+                .cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+
+        verify(transactionRepository).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_ForeignCategoryIdFilter_IsNotAnError() throws Exception {
+        mockMvc.perform(get("/api/transactions")
+                .param("categoryId", String.valueOf(FOREIGN_CATEGORY_ID))
+                .cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void getMyTransactions_FromAfterTo_Returns400WithFromFieldError() throws Exception {
+        mockMvc.perform(get("/api/transactions")
+                .param("from", "2026-02-01")
+                .param("to", "2026-01-31")
+                .cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.from").exists());
+
+        verify(transactionRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_EqualFromAndTo_IsAcceptedBecauseTheBoundsAreInclusive() throws Exception {
+        mockMvc.perform(get("/api/transactions")
+                .param("from", "2026-01-01")
+                .param("to", "2026-01-01")
+                .cookie(authCookie()))
+                .andExpect(status().isOk());
+
+        verify(transactionRepository).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_MalformedFromDate_Returns400WithFromFieldError() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("from", "01-01-2026").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.from").exists());
+
+        verify(transactionRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_UnknownType_Returns400WithTypeFieldError() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("type", "REFUND").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.type").exists());
+
+        verify(transactionRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_NonNumericCategoryId_Returns400WithCategoryIdFieldError() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("categoryId", "abc").cookie(authCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.categoryId").exists());
+
+        verify(transactionRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
+    @Test
+    void getMyTransactions_WithoutAuthCookie_Returns401() throws Exception {
+        mockMvc.perform(get("/api/transactions"))
+                .andExpect(status().isUnauthorized());
+
+        verify(transactionRepository, never()).findAll(anySpecification(), any(Pageable.class));
+    }
+
     @Test
     void updateTransaction_WithoutAuthCookie_Returns401() throws Exception {
         Cookie csrf = csrfCookie();
@@ -278,5 +539,29 @@ class TransactionControllerMvcTest {
                 .andExpect(status().isUnauthorized());
 
         verify(transactionRepository, never()).save(any(Transaction.class));
+    }
+
+    @Test
+    void getMyTransactions_UnknownSortField_RejectsBeforeResolvingTheCurrentUser() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("sort", "user.password").cookie(authCookie()))
+                .andExpect(status().isBadRequest());
+
+        verify(userService, never()).getCurrentUser();
+    }
+
+    @Test
+    void getMyTransactions_SizeAboveHundred_RejectsBeforeResolvingTheCurrentUser() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("size", "101").cookie(authCookie()))
+                .andExpect(status().isBadRequest());
+
+        verify(userService, never()).getCurrentUser();
+    }
+
+    @Test
+    void getMyTransactions_NegativePage_RejectsBeforeResolvingTheCurrentUser() throws Exception {
+        mockMvc.perform(get("/api/transactions").param("page", "-1").cookie(authCookie()))
+                .andExpect(status().isBadRequest());
+
+        verify(userService, never()).getCurrentUser();
     }
 }
