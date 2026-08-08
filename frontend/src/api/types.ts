@@ -116,3 +116,45 @@ export interface ReportsSummaryResponse {
   expense: ReportMetric
   savingsRate: SavingsRateMetric
 }
+
+export interface CategoryReportItem {
+  categoryId: number
+  categoryName: string
+  total: number
+  percentage: number | null
+}
+
+export interface CategoryReportResponse {
+  month: string
+  total: number
+  categories: CategoryReportItem[]
+}
+
+export interface TrendPoint {
+  month: string
+  income: number
+  expense: number
+}
+
+export interface TrendReportResponse {
+  month: string
+  months: number
+  points: TrendPoint[]
+}
+
+export interface BudgetStatusItem {
+  categoryId: number
+  categoryName: string
+  budgeted: number
+  spent: number
+  remaining: number
+  percentageUsed: number | null
+}
+
+export interface BudgetStatusResponse {
+  month: string
+  totalBudgeted: number
+  totalSpent: number
+  unbudgetedSpending: number
+  categories: BudgetStatusItem[]
+}

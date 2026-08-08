@@ -20,7 +20,11 @@ public record ReportPeriod(YearMonth month) {
     }
 
     public static ReportPeriod of(String month, YearMonth serverMonth) {
-        return new ReportPeriod(month == null ? serverMonth : parse(month));
+        return new ReportPeriod(parseMonth(month, serverMonth));
+    }
+
+    public static YearMonth parseMonth(String month, YearMonth serverMonth) {
+        return month == null ? serverMonth : parse(month);
     }
 
     public YearMonth previousMonth() {
