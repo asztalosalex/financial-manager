@@ -1,4 +1,4 @@
-export const DEFAULT_REDIRECT_PATH = '/profile'
+export const DEFAULT_REDIRECT_PATH = '/dashboard'
 
 function normalizeCandidate(value: string): string {
   return value.replace(/[\t\n\r]/g, '').replace(/\\/g, '/')

@@ -39,8 +39,8 @@ function renderLogin(bouncedFrom?: unknown) {
         <LocationProbe />
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/profile" element={<div>Profile page</div>} />
-          <Route path="/profile/transactions" element={<div>Transactions page</div>} />
+          <Route path="/dashboard" element={<div>Dashboard page</div>} />
+          <Route path="/transactions" element={<div>Transactions page</div>} />
         </Routes>
       </AuthContext.Provider>
     </MemoryRouter>,
@@ -85,7 +85,7 @@ describe('Login', () => {
       password: 'secret123',
     })
     expect(auth.refresh).toHaveBeenCalledTimes(1)
-    expect(screen.getByText('Profile page')).toBeInTheDocument()
+    expect(screen.getByText('Dashboard page')).toBeInTheDocument()
   })
 
   it('returns the user to the protected path that bounced them, not a fixed default', async () => {
@@ -93,12 +93,12 @@ describe('Login', () => {
       Promise.resolve(jsonResponse(200, { expiresIn: 3600, message: 'success' })),
     )
 
-    renderLogin('/profile/transactions')
+    renderLogin('/transactions')
     await submitLogin({ email: 'alex@example.com', password: 'secret123' })
 
-    expect(currentPath()).toBe('/profile/transactions')
+    expect(currentPath()).toBe('/transactions')
     expect(screen.getByText('Transactions page')).toBeInTheDocument()
-    expect(screen.queryByText('Profile page')).not.toBeInTheDocument()
+    expect(screen.queryByText('Dashboard page')).not.toBeInTheDocument()
   })
 
   it.each<[string, unknown]>([
@@ -109,7 +109,7 @@ describe('Login', () => {
     ['a tab-smuggled authority', '/\t/evil.example'],
     ['a javascript: URL', 'javascript:alert(1)'],
     ['a non-string value', 42],
-  ])('ignores %s in the redirect state and lands on the default profile page', async (_label, hostileFrom) => {
+  ])('ignores %s in the redirect state and lands on the default dashboard page', async (_label, hostileFrom) => {
     vi.mocked(globalThis.fetch).mockImplementation(() =>
       Promise.resolve(jsonResponse(200, { expiresIn: 3600, message: 'success' })),
     )
@@ -117,8 +117,8 @@ describe('Login', () => {
     renderLogin(hostileFrom)
     await submitLogin({ email: 'alex@example.com', password: 'secret123' })
 
-    expect(currentPath()).toBe('/profile')
-    expect(screen.getByText('Profile page')).toBeInTheDocument()
+    expect(currentPath()).toBe('/dashboard')
+    expect(screen.getByText('Dashboard page')).toBeInTheDocument()
   })
 
   it('translates the 401 invalid_credentials code into display text', async () => {
@@ -136,7 +136,7 @@ describe('Login', () => {
     expect(screen.queryByText('Your session has expired. Please log in again.')).not.toBeInTheDocument()
     expect(unauthorizedHandler).not.toHaveBeenCalled()
     expect(auth.refresh).not.toHaveBeenCalled()
-    expect(screen.queryByText('Profile page')).not.toBeInTheDocument()
+    expect(screen.queryByText('Dashboard page')).not.toBeInTheDocument()
   })
 
   it('lets a corrected password succeed after a rejected attempt', async () => {
@@ -158,7 +158,7 @@ describe('Login', () => {
 
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(2)
     expect(auth.refresh).toHaveBeenCalledTimes(1)
-    expect(screen.getByText('Profile page')).toBeInTheDocument()
+    expect(screen.getByText('Dashboard page')).toBeInTheDocument()
   })
 
   it('renders 400 field errors beside their fields using the Java property keys', async () => {

@@ -1,49 +1,58 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 /* ---------------------------------- */
 /* Design tokens                      */
 /* ---------------------------------- */
 :root {
-  /* Color palette — layered dark neutrals + single emerald accent */
-  --bg: #0b0e13;
-  --bg-soft: #0f131a;
-  --surface: #131822;
-  --surface-2: #1a202c;
-  --border: rgba(148, 163, 184, 0.12);
-  --border-strong: rgba(148, 163, 184, 0.24);
+  --bg: #F5F6F8;
+  --bg-soft: #EFF1F4;
+  --surface: #FFFFFF;
+  --surface-2: #EFF1F4;
+  --surface-overlay: rgba(255, 255, 255, 0.85);
+  --surface-overlay-strong: rgba(255, 255, 255, 0.97);
+  --border: #E7E9EE;
+  --border-strong: #D6D9E0;
 
-  --text: #eef2f7;
-  --text-2: #9aa6b8;
-  --text-3: #64748b;
+  --text: #111318;
+  --text-2: #4A4E58;
+  --text-3: #5F6673;
 
-  --accent: #34d399;
-  --accent-strong: #10b981;
-  --accent-contrast: #06281c;
-  --accent-soft: rgba(52, 211, 153, 0.12);
-  --accent-border: rgba(52, 211, 153, 0.35);
+  --accent: #4F46E5;
+  --accent-strong: #3730A3;
+  --accent-contrast: #FFFFFF;
+  --accent-soft: #EEF2FF;
+  --accent-border: #C7D2FE;
+  --accent-glow: rgba(79, 70, 229, 0.08);
 
-  --danger: #f87171;
-  --danger-soft: rgba(248, 113, 113, 0.12);
-  --danger-border: rgba(248, 113, 113, 0.35);
-  --info: #60a5fa;
+  --avatar-from: #4F46E5;
+  --avatar-to: #818CF8;
+
+  --danger: #B91C1C;
+  --danger-soft: #FEF2F2;
+  --danger-border: #FECACA;
+  --info-soft: #ECFEFF;
 
   /* Shape & elevation */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.45);
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
 
   /* Layout */
   --nav-h: 68px;
   --container: 1160px;
 
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Typography */
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Space Grotesk', var(--font-ui);
+
+  font-family: var(--font-ui);
   line-height: 1.6;
   font-weight: 400;
 
-  color-scheme: dark;
+  color-scheme: light;
   color: var(--text);
   background-color: var(--bg);
 

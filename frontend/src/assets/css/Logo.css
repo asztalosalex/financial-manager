@@ -17,7 +17,9 @@
 }
 
 .logo-text {
+  font-family: var(--font-display);
   font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--accent);
   font-size: inherit;
   white-space: nowrap;
@@ -39,7 +41,7 @@
 }
 
 .logo-medium .logo-text {
-  font-size: 1.125rem;
+  font-size: 17px;
 }
 
 .logo-large .logo-image {

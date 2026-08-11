@@ -65,8 +65,8 @@ function originOf(path: string): string {
 }
 
 describe('resolveRedirectPath', () => {
-  it('exports /profile as the default redirect target', () => {
-    expect(DEFAULT_REDIRECT_PATH).toBe('/profile')
+  it('exports /dashboard as the default redirect target', () => {
+    expect(DEFAULT_REDIRECT_PATH).toBe('/dashboard')
   })
 
   it.each(REJECTED)('rejects %s and falls back', (_label, hostile) => {
@@ -95,30 +95,30 @@ describe('resolveRedirectPath', () => {
   })
 
   describe('the fallback parameter', () => {
-    it('is /profile when omitted', () => {
-      expect(resolveRedirectPath(undefined)).toBe('/profile')
+    it('is /dashboard when omitted', () => {
+      expect(resolveRedirectPath(undefined)).toBe('/dashboard')
     })
 
-    it('is honoured instead of /profile for a non-string candidate', () => {
+    it('is honoured instead of the default for a non-string candidate', () => {
       expect(resolveRedirectPath(null, '/login')).toBe('/login')
     })
 
-    it('is honoured instead of /profile for a rejected protocol-relative URL', () => {
-      expect(resolveRedirectPath('//evil.example/', '/dashboard')).toBe('/dashboard')
+    it('is honoured instead of the default for a rejected protocol-relative URL', () => {
+      expect(resolveRedirectPath('//evil.example/', '/settings')).toBe('/settings')
     })
 
-    it('is honoured instead of /profile for a rejected relative path', () => {
+    it('is honoured instead of the default for a rejected relative path', () => {
       expect(resolveRedirectPath('profile', '/')).toBe('/')
     })
 
     it('is ignored when the candidate is a valid path', () => {
-      expect(resolveRedirectPath('/profile/transactions', '/dashboard')).toBe(
+      expect(resolveRedirectPath('/profile/transactions', '/settings')).toBe(
         '/profile/transactions',
       )
     })
 
     it('does not leak into the accepted branch even when it differs from the default', () => {
-      expect(resolveRedirectPath('/', '/dashboard')).toBe('/')
+      expect(resolveRedirectPath('/', '/settings')).toBe('/')
     })
   })
 })

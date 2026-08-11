@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import Profile from './Profile'
+import Settings from './Settings'
 import { AuthContext, type AuthContextValue } from '../auth/AuthContext'
 import { setUnauthorizedHandler } from '../api/client'
 import { emptyResponse, errorResponse, jsonResponse } from '../test/helpers'
@@ -15,7 +15,7 @@ const USER: UserResponseDto = {
   lastLogin: '2026-08-01T08:30:00.000Z',
 }
 
-function renderProfile() {
+function renderSettings() {
   const auth = {
     status: 'authenticated',
     user: USER,
@@ -28,11 +28,11 @@ function renderProfile() {
   } satisfies AuthContextValue
 
   render(
-    <MemoryRouter initialEntries={['/profile']}>
+    <MemoryRouter initialEntries={['/settings']}>
       <AuthContext.Provider value={auth}>
         <Routes>
           <Route path="/" element={<div>Landing page</div>} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </AuthContext.Provider>
     </MemoryRouter>,
@@ -69,7 +69,7 @@ function lastRequest() {
   return calls[calls.length - 1]
 }
 
-describe('Profile', () => {
+describe('Settings', () => {
   beforeEach(() => {
     setUnauthorizedHandler(null)
     vi.stubGlobal('fetch', vi.fn())
@@ -77,6 +77,14 @@ describe('Profile', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  it('names the page with a single first level heading', () => {
+    renderSettings()
+
+    const headings = screen.getAllByRole('heading', { level: 1 })
+    expect(headings).toHaveLength(1)
+    expect(headings[0]).toHaveTextContent('Settings')
   })
 
   it('promotes the updated user into the session after a 200 save', async () => {
@@ -87,7 +95,7 @@ describe('Profile', () => {
     }
     vi.mocked(globalThis.fetch).mockImplementation(() => Promise.resolve(jsonResponse(200, updated)))
 
-    const auth = renderProfile()
+    const auth = renderSettings()
     await submitProfileEdit({ username: 'alexandra', email: 'alexandra@example.com' })
 
     const [url, init] = lastRequest()
@@ -108,7 +116,7 @@ describe('Profile', () => {
     const updated: UserResponseDto = { ...USER, email: 'submitted@example.com' }
     vi.mocked(globalThis.fetch).mockImplementation(() => Promise.resolve(jsonResponse(200, updated)))
 
-    const auth = renderProfile()
+    const auth = renderSettings()
     fireEvent.click(screen.getByRole('button', { name: 'Edit Profile' }))
     fireEvent.change(screen.getByLabelText('Email:'), {
       target: { value: 'submitted@example.com' },
@@ -142,7 +150,7 @@ describe('Profile', () => {
       ),
     )
 
-    const auth = renderProfile()
+    const auth = renderSettings()
     await submitProfileEdit({ username: '', email: 'not-an-email' })
 
     expect(screen.getByText('Username must not be blank')).toHaveClass('field-error')
@@ -159,7 +167,7 @@ describe('Profile', () => {
       Promise.resolve(errorResponse(409, 'That email is already registered', undefined, '/api/users/7')),
     )
 
-    const auth = renderProfile()
+    const auth = renderSettings()
     await submitProfileEdit({ username: 'alex', email: 'taken@example.com' })
 
     expect(screen.getByText('That email is already registered')).toHaveClass('auth-error')
@@ -178,7 +186,7 @@ describe('Profile', () => {
       )
     })
 
-    const auth = renderProfile()
+    const auth = renderSettings()
     await submitProfileEdit({ username: 'alex', email: 'taken@example.com' })
     expect(screen.getByText('That email is already registered')).toBeInTheDocument()
 
@@ -196,7 +204,7 @@ describe('Profile', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(globalThis.fetch).mockImplementation(() => Promise.resolve(emptyResponse(204)))
 
-    const auth = renderProfile()
+    const auth = renderSettings()
     await clickDeleteAccount()
 
     const [url, init] = lastRequest()
@@ -212,7 +220,7 @@ describe('Profile', () => {
       Promise.resolve(errorResponse(404, 'User not found', undefined, '/api/users/7')),
     )
 
-    const auth = renderProfile()
+    const auth = renderSettings()
     await clickDeleteAccount()
 
     expect(screen.getByText('User not found')).toHaveClass('auth-error')
@@ -224,7 +232,7 @@ describe('Profile', () => {
   it('does not call the API when the delete confirmation is dismissed', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false)
 
-    const auth = renderProfile()
+    const auth = renderSettings()
     await clickDeleteAccount()
 
     expect(globalThis.fetch).not.toHaveBeenCalled()

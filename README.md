@@ -1,109 +1,138 @@
 # Financial Manager
 
-A full-stack personal finance management application with Spring Boot backend and future frontend implementation.
+A full-stack personal finance management application. Users track income and expenses, organize spending into categories, set monthly budgets, and view analytical reports (spending trends, category breakdowns, savings rate, budget status).
+
+Backend: Spring Boot REST API. Frontend: React + TypeScript SPA. Both are containerized behind an HTTPS-terminating nginx reverse proxy for local development.
 
 ## Project Structure
 
 ```
 financial-manager/
 ├── backend/                    # Spring Boot REST API
+│   ├── src/main/java/hu/financial/
+│   │   ├── controller/          # REST endpoints
+│   │   ├── service/              # Business logic
+│   │   ├── repository/           # Spring Data JPA repositories + specifications
+│   │   ├── model/                 # JPA entities
+│   │   ├── dto/                   # Request/response DTOs per domain
+│   │   ├── security/              # JWT + CSRF cookie handling
+│   │   └── exception/              # Domain exceptions + global handler
+│   ├── src/main/resources/db/migration/  # Flyway SQL migrations
+│   ├── src/test/                 # Unit + integration tests (Testcontainers)
+│   └── Dockerfile
+├── frontend/                    # React + TypeScript SPA
 │   ├── src/
-│   ├── pom.xml
-│   ├── Dockerfile
-│   └── ...
-├── frontend/                   # Frontend application (to be implemented)
-│   └── (empty for now)
-├── docker-compose.yml          # Full-stack orchestration
+│   │   ├── pages/                 # Route-level views (Dashboard, Transactions, Categories, Settings, Login, Register)
+│   │   ├── components/            # Reusable UI + layout components
+│   │   ├── api/                    # Typed fetch client per domain
+│   │   └── auth/                    # Auth context/provider, route guarding
+│   └── Dockerfile
+├── nginx.conf                   # HTTPS reverse proxy for frontend + backend
+├── docker-compose.yml           # Full-stack orchestration (db, backend, frontend, nginx)
 └── README.md
 ```
 
+## Features
+
+- **Authentication** — registration, login, logout; JWT stored in an `httpOnly` cookie with double-submit CSRF protection (not header-based bearer tokens).
+- **Transactions** — CRUD, filterable and paginated listing.
+- **Categories** — CRUD, scoped per user.
+- **Budgets** — CRUD, filterable listing.
+- **Reports** — income/expense summary, category breakdown, spending trend over time, and budget-status tracking.
+- **User profile** — view/update profile, change password.
+
 ## Backend
 
-The backend is a Spring Boot application providing REST APIs for:
-
-- User authentication and authorization (JWT)
-- Budget management
-- Transaction tracking
-- Category management
+Layered Spring Boot REST API (`controller → service → repository`) with DTOs and mappers isolating the persistence model from the API contract.
 
 ### Technologies
 
 - Java 21
-- Spring Boot 3.2.5
-- Spring Security
-- Spring Data JPA
-- PostgreSQL
-- JWT Authentication
+- Spring Boot 3.2.5 (Web, Security, Data JPA, Validation)
+- PostgreSQL + Flyway migrations
+- JWT (jjwt) issued as an `httpOnly` cookie, with CSRF double-submit cookie protection
+- springdoc-openapi (Swagger UI)
+- JUnit 5, Spring Security Test, Testcontainers (PostgreSQL) for integration tests
 - Docker
 
 ### Running the Backend
 
-1. **Using Docker Compose (Recommended)**:
+1. **Using Docker Compose (recommended)**:
    ```bash
    docker-compose up -d
    ```
 
-2. **Using Maven** (requires JDK 21 and Maven 3.9+ installed):
+2. **Using Maven** (requires JDK 21 and Maven 3.9+ installed, PostgreSQL running locally):
    ```bash
    cd backend
    mvn spring-boot:run
    ```
 
-The API will be available at `http://localhost:8080`
+The API is available at `http://localhost:8080` (or `https://backend.fmanager.local` behind the nginx proxy, see [TLS Certificates](#tls-certificates)).
 
 ### API Documentation
 
-Swagger UI is available at `http://localhost:8080/swagger-ui.html`
+Swagger UI is available at `/swagger-ui.html` on the backend host.
+
+### Tests
+
+```bash
+cd backend
+mvn test           # unit tests
+mvn verify          # unit + Testcontainers integration tests
+```
 
 ## Frontend
 
-The frontend is a React application built with TypeScript and Vite, providing a modern user interface for managing personal finances.
+A React SPA built with TypeScript and Vite. Uses the native `fetch` API through a small typed client (`src/api/client.ts`) rather than an HTTP library — it attaches the CSRF header automatically and centralizes 401 handling.
 
 ### Technologies
 
-- React 18 with TypeScript
-- Vite (build tool)
-- React Router (routing)
-- Axios (HTTP client)
-- Tailwind CSS (styling)
-- Docker & Nginx (production)
-
-### Features
-
-- User authentication (login/register)
-- Dashboard with financial overview
-- Transaction management (planned)
-- Budget tracking (planned)
-- Category management (planned)
+- React 19 + TypeScript
+- Vite (build tool and dev server)
+- React Router (routing, incl. route guarding for authenticated pages)
+- Plain CSS (no UI framework)
+- Vitest + React Testing Library
+- Docker & nginx (production image)
 
 ### Running the Frontend
 
-1. **Using Docker Compose (Recommended)**:
+1. **Using Docker Compose (recommended)**:
    ```bash
    docker-compose up -d
    ```
 
-2. **Development mode**:
+2. **Development mode** (proxies `/api` to `https://backend.fmanager.local`, see [TLS Certificates](#tls-certificates)):
    ```bash
    cd frontend
    npm install
    npm run dev
    ```
 
-The frontend will be available at `http://localhost:3000`
+### Tests & Linting
+
+```bash
+cd frontend
+npm test          # vitest run, writes test-results.json
+npm run typecheck  # tsc --noEmit
+npm run lint       # eslint
+```
+
+Once the stack is running behind nginx, the app is available at `https://frontend.fmanager.local` and the API at `https://backend.fmanager.local`.
 
 ## Development
 
 ### Prerequisites
 
 - Java 21
-- Maven 3.6+
+- Maven 3.9+
+- Node.js 20+
 - Docker and Docker Compose
-- PostgreSQL (if running locally)
+- PostgreSQL (if running the backend locally without Docker)
 
 ### TLS Certificates
 
-The project uses HTTPS locally via nginx. You need to generate self-signed certificates with [mkcert](https://github.com/FiloSottile/mkcert).
+The project uses HTTPS locally via nginx. Generate self-signed certificates with [mkcert](https://github.com/FiloSottile/mkcert).
 
 1. **Install mkcert**:
    ```bash
@@ -139,8 +168,6 @@ The project uses HTTPS locally via nginx. You need to generate self-signed certi
    127.0.0.1 frontend.fmanager.local
    127.0.0.1 backend.fmanager.local
    ```
-
-After this, the app is available at `https://frontend.fmanager.local` and the API at `https://backend.fmanager.local`.
 
 ### Environment Variables
 
