@@ -51,9 +51,9 @@ public class AuthenticationServiceTest {
   @Test
   void signup_ShouldReturnUser_WhenValidRegistrationData() {
     // Arrange
-    when(userRepository.findByEmail(registerUserDto.getEmail())).thenReturn(null);
-    when(userRepository.findByUsername(registerUserDto.getUsername())).thenReturn(null);
-    when(passwordEncoder.encode(registerUserDto.getPassword())).thenReturn("encodedPassword");
+    when(userRepository.findByEmail(registerUserDto.email())).thenReturn(null);
+    when(userRepository.findByUsername(registerUserDto.username())).thenReturn(null);
+    when(passwordEncoder.encode(registerUserDto.password())).thenReturn("encodedPassword");
     when(userRepository.save(any(User.class))).thenReturn(testUser);
 
     // Act
@@ -62,13 +62,13 @@ public class AuthenticationServiceTest {
     // Assert
     assertNotNull(result);
     assertEquals(testUser, result);
-    verify(passwordEncoder).encode(registerUserDto.getPassword());
+    verify(passwordEncoder).encode(registerUserDto.password());
     verify(userRepository).save(any(User.class));
   }
 
   @Test
   void signup_ShouldThrowDuplicateUser_WhenEmailAlreadyRegistered() {
-    when(userRepository.findByEmail(registerUserDto.getEmail())).thenReturn(testUser);
+    when(userRepository.findByEmail(registerUserDto.email())).thenReturn(testUser);
 
     assertThrows(DuplicateUserException.class, () -> authenticationService.signup(registerUserDto));
     verify(userRepository, never()).save(any(User.class));
@@ -76,8 +76,8 @@ public class AuthenticationServiceTest {
 
   @Test
   void signup_ShouldThrowDuplicateUser_WhenUsernameAlreadyRegistered() {
-    when(userRepository.findByEmail(registerUserDto.getEmail())).thenReturn(null);
-    when(userRepository.findByUsername(registerUserDto.getUsername())).thenReturn(testUser);
+    when(userRepository.findByEmail(registerUserDto.email())).thenReturn(null);
+    when(userRepository.findByUsername(registerUserDto.username())).thenReturn(testUser);
 
     assertThrows(DuplicateUserException.class, () -> authenticationService.signup(registerUserDto));
     verify(userRepository, never()).save(any(User.class));
@@ -89,7 +89,7 @@ public class AuthenticationServiceTest {
     Authentication authentication = mock(Authentication.class);
     // Arrange
     when(authenticationManager.authenticate(any())).thenReturn(authentication);
-    when(userRepository.findByEmail(loginUserDto.getEmail())).thenReturn(testUser);
+    when(userRepository.findByEmail(loginUserDto.email())).thenReturn(testUser);
     when(userRepository.save(any(User.class))).thenReturn(testUser);
 
     // Act
@@ -99,7 +99,7 @@ public class AuthenticationServiceTest {
     assertNotNull(result);
     assertEquals(testUser, result);
     verify(authenticationManager).authenticate(any());
-    verify(userRepository).findByEmail(loginUserDto.getEmail());
+    verify(userRepository).findByEmail(loginUserDto.email());
     verify(userRepository).save(testUser);
   }
 
@@ -119,10 +119,10 @@ public class AuthenticationServiceTest {
   @Test
   void authenticate_ShouldThrowUserNotFound_WhenUserMissingAfterAuthentication() {
     when(authenticationManager.authenticate(any())).thenReturn(mock(Authentication.class));
-    when(userRepository.findByEmail(loginUserDto.getEmail())).thenReturn(null);
+    when(userRepository.findByEmail(loginUserDto.email())).thenReturn(null);
 
     assertThrows(UserNotFoundException.class, () -> authenticationService.authenticate(loginUserDto));
-    verify(userRepository).findByEmail(loginUserDto.getEmail());
+    verify(userRepository).findByEmail(loginUserDto.email());
     verify(userRepository, never()).save(any(User.class));
   }
 }

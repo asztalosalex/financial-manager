@@ -189,9 +189,9 @@ public class CategoryServiceTest {
   void mapToDto_ShouldMapAllFields() {
     CategoryResponseDto result = categoryService.mapToDto(testCategory);
 
-    assertEquals(testCategory.getId(), result.getId());
-    assertEquals(testCategory.getName(), result.getName());
-    assertEquals(testCategory.getDescription(), result.getDescription());
+    assertEquals(testCategory.getId(), result.id());
+    assertEquals(testCategory.getName(), result.name());
+    assertEquals(testCategory.getDescription(), result.description());
   }
 
   @Test
@@ -200,8 +200,8 @@ public class CategoryServiceTest {
 
     Category result = categoryService.mapToEntity(testCategoryDto);
 
-    assertEquals(testCategoryDto.getName(), result.getName());
-    assertEquals(testCategoryDto.getDescription(), result.getDescription());
+    assertEquals(testCategoryDto.name(), result.getName());
+    assertEquals(testCategoryDto.description(), result.getDescription());
     assertEquals(testUser, result.getUser());
   }
 }

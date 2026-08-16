@@ -57,8 +57,8 @@ public class CategoryController {
         Long currentUserId = userService.getCurrentUser().getId();
         Category existingCategory = categoryService.getOwnedCategoryById(id, currentUserId);
 
-        existingCategory.setName(dto.getName());
-        existingCategory.setDescription(dto.getDescription());
+        existingCategory.setName(dto.name());
+        existingCategory.setDescription(dto.description());
         Category updatedCategory = categoryService.updateCategory(existingCategory);
         CategoryResponseDto responseDto = categoryService.mapToDto(updatedCategory);
         return ResponseEntity.ok(responseDto);

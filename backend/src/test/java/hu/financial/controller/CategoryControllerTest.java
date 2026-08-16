@@ -69,8 +69,8 @@ public class CategoryControllerTest {
     assertNotNull(response);
     assertEquals(HttpStatus.CREATED, response.getStatusCode());
     assertNotNull(response.getBody());
-    assertEquals(testCategory.getName(), response.getBody().getName());
-    assertEquals(testCategory.getDescription(), response.getBody().getDescription());
+    assertEquals(testCategory.getName(), response.getBody().name());
+    assertEquals(testCategory.getDescription(), response.getBody().description());
 
     verify(categoryService).mapToEntity(any(CreateCategoryDto.class));
     verify(categoryService).createCategory(any(Category.class));
@@ -91,8 +91,8 @@ public class CategoryControllerTest {
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(testCategory.getName(), response.getBody().get(0).getName());
-        assertEquals(testCategory.getDescription(), response.getBody().get(0).getDescription());
+        assertEquals(testCategory.getName(), response.getBody().get(0).name());
+        assertEquals(testCategory.getDescription(), response.getBody().get(0).description());
 
         verify(categoryService).getCategoriesByUserId(testUser.getId());
         verify(categoryService).mapToDto(testCategory);
@@ -112,8 +112,8 @@ public class CategoryControllerTest {
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(testCategory.getName(), response.getBody().getName());
-        assertEquals(testCategory.getDescription(), response.getBody().getDescription());
+        assertEquals(testCategory.getName(), response.getBody().name());
+        assertEquals(testCategory.getDescription(), response.getBody().description());
 
         verify(categoryService).getOwnedCategoryById(testCategory.getId(), testUser.getId());
         verify(categoryService).mapToDto(testCategory);

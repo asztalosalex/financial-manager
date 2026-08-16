@@ -33,17 +33,17 @@ public class AuthenticationService {
 
     @Transactional
     public User signup(RegisterUserDto input) {
-        if (userRepository.findByEmail(input.getEmail()) != null) {
-            throw new DuplicateUserException("email", input.getEmail());
+        if (userRepository.findByEmail(input.email()) != null) {
+            throw new DuplicateUserException("email", input.email());
         }
-        if (userRepository.findByUsername(input.getUsername()) != null) {
-            throw new DuplicateUserException("username", input.getUsername());
+        if (userRepository.findByUsername(input.username()) != null) {
+            throw new DuplicateUserException("username", input.username());
         }
 
         User user = new User();
-        user.setUsername(input.getUsername());
-        user.setEmail(input.getEmail());
-        user.setPassword(passwordEncoder.encode(input.getPassword()));
+        user.setUsername(input.username());
+        user.setEmail(input.email());
+        user.setPassword(passwordEncoder.encode(input.password()));
         user.setCreatedAt(LocalDateTime.now());
         try {
             return userRepository.save(user);
@@ -55,12 +55,12 @@ public class AuthenticationService {
     @Transactional
     public User authenticate(LoginUserDto input) {
         authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(input.getEmail(), input.getPassword())
+            new UsernamePasswordAuthenticationToken(input.email(), input.password())
         );
 
-        User user = userRepository.findByEmail(input.getEmail());
+        User user = userRepository.findByEmail(input.email());
         if (user == null) {
-            throw new UserNotFoundException("User not found with email: " + input.getEmail());
+            throw new UserNotFoundException("User not found with email: " + input.email());
         }
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);

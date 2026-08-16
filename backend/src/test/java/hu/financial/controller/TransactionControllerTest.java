@@ -85,7 +85,7 @@ public class TransactionControllerTest {
         assertNotNull(response);
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(testTransaction.getId(), response.getBody().getId());
+        assertEquals(testTransaction.getId(), response.getBody().id());
         verify(transactionService).createTransaction(any(Transaction.class));
     }
 
@@ -105,7 +105,7 @@ public class TransactionControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(1, response.getBody().content().size());
-        assertEquals(testTransaction.getId(), response.getBody().content().get(0).getId());
+        assertEquals(testTransaction.getId(), response.getBody().content().get(0).id());
         assertEquals(0, response.getBody().page());
         assertEquals(20, response.getBody().size());
         assertEquals(1, response.getBody().totalElements());
@@ -159,7 +159,7 @@ public class TransactionControllerTest {
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(testTransaction.getId(), response.getBody().getId());
+        assertEquals(testTransaction.getId(), response.getBody().id());
     }
 
     @Test

@@ -86,11 +86,11 @@ public class TransactionService {
   public Transaction mapToEntity(CreateTransactionDto dto) {
     User currentUser = userService.getCurrentUser();
     Transaction transaction = new Transaction();
-    transaction.setType(dto.getType());
-    transaction.setDescription(dto.getDescription());
-    transaction.setAmount(dto.getAmount().setScale(2, RoundingMode.HALF_UP));
-    transaction.setDate(dto.getDate());
-    transaction.setCategory(categoryService.getOwnedCategoryById(dto.getCategoryId(), currentUser.getId()));
+    transaction.setType(dto.type());
+    transaction.setDescription(dto.description());
+    transaction.setAmount(dto.amount().setScale(2, RoundingMode.HALF_UP));
+    transaction.setDate(dto.date());
+    transaction.setCategory(categoryService.getOwnedCategoryById(dto.categoryId(), currentUser.getId()));
     transaction.setUser(currentUser);
     return transaction;
   }

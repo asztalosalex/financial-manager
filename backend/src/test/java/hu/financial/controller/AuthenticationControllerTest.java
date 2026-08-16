@@ -17,7 +17,7 @@ import hu.financial.dto.user.RegisterUserDto;
 import hu.financial.dto.user.UserResponseDto;
 import hu.financial.mapper.UserMapper;
 import hu.financial.model.User;
-import hu.financial.responses.LoginResponse;
+import hu.financial.dto.user.LoginResponse;
 import hu.financial.security.SecurityCookieFactory;
 import hu.financial.service.AuthenticationService;
 import hu.financial.service.JwtService;
@@ -80,8 +80,8 @@ public class AuthenticationControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
 
-        assertEquals(testUser.getUsername(), response.getBody().getUsername());
-        assertEquals(testUser.getEmail(), response.getBody().getEmail());
+        assertEquals(testUser.getUsername(), response.getBody().username());
+        assertEquals(testUser.getEmail(), response.getBody().email());
         assertNull(response.getHeaders().getFirst(HttpHeaders.SET_COOKIE));
 
         verify(authenticationService, times(1)).signup(registerUserDto);
@@ -97,8 +97,8 @@ public class AuthenticationControllerTest {
 
         assertNotNull(response);
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-        assertEquals("invalid_credentials", response.getBody().getMessage());
-        assertNull(response.getBody().getExpiresIn());
+        assertEquals("invalid_credentials", response.getBody().message());
+        assertNull(response.getBody().expiresIn());
 
         verify(authenticationService, times(1)).authenticate(loginUserDto);
         verify(jwtService, never()).generateToken(any(User.class));
@@ -132,8 +132,8 @@ public class AuthenticationControllerTest {
         ResponseEntity<LoginResponse> response = authenticationController.login(loginUserDto);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("success", response.getBody().getMessage());
-        assertEquals(3600L, response.getBody().getExpiresIn());
+        assertEquals("success", response.getBody().message());
+        assertEquals(3600L, response.getBody().expiresIn());
         assertTrue(response.getHeaders().getFirst(HttpHeaders.SET_COOKIE).startsWith("authToken=token"));
         verify(authenticationService, times(1)).authenticate(loginUserDto);
     }

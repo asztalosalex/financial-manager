@@ -1,20 +1,15 @@
 package hu.financial.dto.budget;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class BudgetResponseDto {
 
-    private Long id;
-    private BigDecimal amount;
-    private LocalDate month;
-    private Long categoryId;
-    private String categoryName;
-}
+
+public record BudgetResponseDto(
+
+        Long id,
+        BigDecimal amount,
+        LocalDate month,
+        Long categoryId,
+        String categoryName
+){}

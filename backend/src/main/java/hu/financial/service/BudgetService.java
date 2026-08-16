@@ -81,9 +81,9 @@ public class BudgetService {
     public Budget mapToEntity(CreateBudgetDto dto) {
         User currentUser = userService.getCurrentUser();
         Budget budget = new Budget();
-        budget.setAmount(dto.getAmount().setScale(2, RoundingMode.HALF_UP));
-        budget.setMonth(dto.getMonth());
-        budget.setCategory(categoryService.getOwnedCategoryById(dto.getCategoryId(), currentUser.getId()));
+        budget.setAmount(dto.amount().setScale(2, RoundingMode.HALF_UP));
+        budget.setMonth(dto.month());
+        budget.setCategory(categoryService.getOwnedCategoryById(dto.categoryId(), currentUser.getId()));
         budget.setUser(currentUser);
         return budget;
     }

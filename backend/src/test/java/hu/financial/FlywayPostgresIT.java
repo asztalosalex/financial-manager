@@ -72,8 +72,8 @@ class FlywayPostgresIT {
 
         GetUserByIdDto result = userService.getUserByIdDto(user.getId());
 
-        assertEquals(1, result.getCategories().size());
-        assertEquals("groceries", result.getCategories().get(0).getName());
+        assertEquals(1, result.categories().size());
+        assertEquals("groceries", result.categories().get(0).name());
     }
 
     @Test

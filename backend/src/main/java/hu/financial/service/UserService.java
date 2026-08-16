@@ -58,16 +58,16 @@ public class UserService implements UserDetailsService {
         User existingUser = getUserById(id);
     
         User userDetails = new User();
-        userDetails.setUsername(updateProfileDto.getUsername());
-        userDetails.setEmail(updateProfileDto.getEmail());
+        userDetails.setUsername(updateProfileDto.username());
+        userDetails.setEmail(updateProfileDto.email());
         
         validateUserForUpdate(existingUser, userDetails);
         
-        if (StringUtils.hasText(updateProfileDto.getUsername())) {
-            existingUser.setUsername(updateProfileDto.getUsername());
+        if (StringUtils.hasText(updateProfileDto.username())) {
+            existingUser.setUsername(updateProfileDto.username());
         }
-        if (StringUtils.hasText(updateProfileDto.getEmail())) {
-            existingUser.setEmail(updateProfileDto.getEmail());
+        if (StringUtils.hasText(updateProfileDto.email())) {
+            existingUser.setEmail(updateProfileDto.email());
         }
         
         return userRepository.save(existingUser);
@@ -122,11 +122,11 @@ public class UserService implements UserDetailsService {
 
     @Transactional
     public void changePassword(User user, ChangePasswordRequestDto request) {
-        if (!verifyPassword(request.getCurrentPassword(), user.getPassword())) {
+        if (!verifyPassword(request.currentPassword(), user.getPassword())) {
             throw new InvalidPasswordException("currentPassword", "Current password is incorrect");
         }
         User existingUser = getUserById(user.getId());
-        existingUser.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        existingUser.setPassword(passwordEncoder.encode(request.newPassword()));
         userRepository.save(existingUser);
     }
 

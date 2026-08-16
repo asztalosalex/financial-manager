@@ -83,7 +83,7 @@ public class BudgetControllerTest {
         assertNotNull(response);
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(testBudget.getId(), response.getBody().getId());
+        assertEquals(testBudget.getId(), response.getBody().id());
         verify(budgetService).createBudget(any(Budget.class));
     }
 
@@ -102,7 +102,7 @@ public class BudgetControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(1, response.getBody().content().size());
-        assertEquals(testBudget.getId(), response.getBody().content().get(0).getId());
+        assertEquals(testBudget.getId(), response.getBody().content().get(0).id());
         assertEquals(0, response.getBody().page());
         assertEquals(20, response.getBody().size());
         assertEquals(1, response.getBody().totalElements());
@@ -151,7 +151,7 @@ public class BudgetControllerTest {
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(testBudget.getId(), response.getBody().getId());
+        assertEquals(testBudget.getId(), response.getBody().id());
     }
 
     @Test

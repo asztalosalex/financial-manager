@@ -94,8 +94,8 @@ public class CategoryService {
 
     public Category mapToEntity(CreateCategoryDto createCategoryDto) {
         Category category = new Category();
-        category.setName(createCategoryDto.getName());
-        category.setDescription(createCategoryDto.getDescription());
+        category.setName(createCategoryDto.name());
+        category.setDescription(createCategoryDto.description());
         category.setUser(userService.getCurrentUser());
         return category;
     }

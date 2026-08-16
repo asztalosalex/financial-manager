@@ -4,7 +4,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import hu.financial.responses.LoginResponse;
+import hu.financial.dto.user.LoginResponse;
 import hu.financial.dto.user.LoginUserDto;
 import hu.financial.dto.user.RegisterUserDto;
 import hu.financial.dto.user.UserResponseDto;
@@ -63,7 +63,7 @@ public class AuthenticationController {
                     .header(HttpHeaders.SET_COOKIE, securityCookieFactory.createAuthCookie(token).toString())
                     .body(response);
         } catch (AuthenticationException e) {
-            log.warn("Failed login attempt for email: {}", input.getEmail());
+            log.warn("Failed login attempt for email: {}", input.email());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new LoginResponse(null, "invalid_credentials"));
         }
