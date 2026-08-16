@@ -1912,6 +1912,177 @@
 }
 
 /* ==================================== */
+/* Budgets                              */
+/* ==================================== */
+.budget-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.budget-filters-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 160px;
+}
+
+.budget-filters-field label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.budget-filters-field select,
+.budget-filters-field input[type='month'] {
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.budget-filters-field select:focus,
+.budget-filters-field input[type='month']:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.budget-filters-clear {
+  padding-bottom: 0.75rem;
+}
+
+.budgets-list {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.budget-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 4px;
+  border-top: 1px solid var(--surface-2);
+}
+
+.budget-row-category {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-row-month {
+  flex: none;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.budget-row-amount {
+  flex: none;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.budget-row-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex: none;
+}
+
+.budget-form-section {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+}
+
+.budget-form-section h3 {
+  font-size: 1.05rem;
+  margin: 0 0 1.25rem;
+}
+
+.budget-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.budget-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0;
+}
+
+.budget-form label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.budget-form select,
+.budget-form input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  max-width: 400px;
+}
+
+.budget-form select:focus,
+.budget-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+@media (max-width: 899.98px) {
+  .budget-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .budget-filters-field {
+    min-width: 0;
+  }
+
+  .budget-filters-clear {
+    padding-bottom: 0;
+    align-self: flex-start;
+  }
+
+  .budget-row {
+    flex-wrap: wrap;
+  }
+}
+
+/* ==================================== */
 /* Utilities                            */
 /* ==================================== */
 .flex-between {

@@ -62,6 +62,17 @@ const NAV_ITEMS: NavItem[] = [
     )
   },
   {
+    to: '/budgets',
+    label: 'Budgets',
+    icon: (
+      <svg {...ICON_PROPS}>
+        <rect x="3" y="6" width="18" height="13" rx="2" />
+        <path d="M3 10h18" />
+        <rect x="14.5" y="12.5" width="3.5" height="3" rx="0.5" />
+      </svg>
+    )
+  },
+  {
     to: '/settings',
     label: 'Settings',
     icon: (

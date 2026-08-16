@@ -29,6 +29,17 @@ function backendResponse(url: string): Response {
       last: true,
     })
   }
+  if (url.startsWith('/api/budgets')) {
+    return jsonResponse(200, {
+      content: [],
+      page: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+      first: true,
+      last: true,
+    })
+  }
   if (url === '/api/users/count') {
     return jsonResponse(200, 42)
   }
@@ -111,6 +122,15 @@ describe('route structure', () => {
     expect(screen.queryByRole('heading', { level: 1, name: 'Settings' })).not.toBeInTheDocument()
   })
 
+  it('sends an unauthenticated visitor from /budgets to the login page', async () => {
+    signedOut()
+
+    const router = renderAt('/budgets')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+    expect(screen.queryByRole('heading', { level: 1, name: 'Budgets' })).not.toBeInTheDocument()
+  })
+
   it('renders the overview page for a signed-in visitor', async () => {
     signedIn()
 
@@ -137,6 +157,17 @@ describe('route structure', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Categories' })).toBeInTheDocument()
     await screen.findByRole('heading', { level: 3, name: 'Your Categories' })
+  })
+
+  it('renders the budgets page for a signed-in visitor', async () => {
+    signedIn()
+
+    renderAt('/budgets')
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Budgets' })).toBeInTheDocument()
+    expect(
+      await screen.findByText('No budgets yet. Add your first budget to get started.'),
+    ).toBeInTheDocument()
   })
 
   it('renders the settings page for a signed-in visitor', async () => {
@@ -229,7 +260,7 @@ describe('route structure', () => {
     await screen.findByRole('heading', { level: 1, name: 'Categories' })
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
-    expect(within(nav).getAllByRole('link')).toHaveLength(4)
+    expect(within(nav).getAllByRole('link')).toHaveLength(5)
     expect(within(nav).queryAllByRole('button')).toHaveLength(0)
     expect(screen.queryByRole('button', { name: /Profile Data/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Income & Expenses/ })).not.toBeInTheDocument()

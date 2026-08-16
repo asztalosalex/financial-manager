@@ -13,8 +13,8 @@ const USER: UserResponseDto = {
   lastLogin: null,
 }
 
-const NAV_LABELS = ['Overview', 'Transactions', 'Categories', 'Settings']
-const NAV_HREFS = ['/dashboard', '/transactions', '/categories', '/settings']
+const NAV_LABELS = ['Overview', 'Transactions', 'Categories', 'Budgets', 'Settings']
+const NAV_HREFS = ['/dashboard', '/transactions', '/categories', '/budgets', '/settings']
 
 function renderSidebar(path = '/dashboard', overrides: Partial<AuthContextValue> = {}) {
   const auth: AuthContextValue = {
@@ -63,11 +63,22 @@ describe('Sidebar', () => {
   it('shows no destination that has no page behind it', () => {
     renderSidebar()
 
-    expect(navLinks()).toHaveLength(4)
-    expect(screen.queryByRole('link', { name: 'Budget' })).not.toBeInTheDocument()
+    expect(navLinks()).toHaveLength(5)
     expect(screen.queryByRole('link', { name: 'Reports' })).not.toBeInTheDocument()
-    expect(screen.queryByText('Budget')).not.toBeInTheDocument()
     expect(screen.queryByText('Reports')).not.toBeInTheDocument()
+  })
+
+  it('points the Budgets nav item at /budgets, between Categories and Settings', () => {
+    renderSidebar()
+
+    expect(screen.getByRole('link', { name: 'Budgets' })).toHaveAttribute('href', '/budgets')
+    expect(navLinks().map((link) => link.textContent)).toEqual([
+      'Overview',
+      'Transactions',
+      'Categories',
+      'Budgets',
+      'Settings',
+    ])
   })
 
   it('marks the nav item of the current route with aria-current', () => {
@@ -81,6 +92,7 @@ describe('Sidebar', () => {
 
     expect(screen.getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current')
     expect(screen.getByRole('link', { name: 'Categories' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('link', { name: 'Budgets' })).not.toHaveAttribute('aria-current')
     expect(screen.getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current')
   })
 
@@ -107,7 +119,7 @@ describe('Sidebar', () => {
     expect(list.tagName).toBe('UL')
 
     const items = within(list).getAllByRole('listitem')
-    expect(items).toHaveLength(4)
+    expect(items).toHaveLength(5)
     items.forEach((item) => {
       expect(item.tagName).toBe('LI')
       expect(within(item).getByRole('link')).toBeInTheDocument()

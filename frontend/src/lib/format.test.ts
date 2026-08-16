@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   computeDeltaTone,
+  formatBudgetMonthLabel,
   formatCurrencyHuf,
   formatHeaderDate,
   formatPercent,
@@ -148,6 +149,34 @@ describe('formatTransactionListDate', () => {
   it('parses the raw date as a local calendar day, not as UTC', () => {
     expect(formatTransactionListDate('2026-01-01')).toBe('Jan 1, 2026')
     expect(formatTransactionListDate('2025-12-31')).toBe('Dec 31, 2025')
+  })
+})
+
+describe('formatBudgetMonthLabel', () => {
+  it('formats a full ISO date as a full month name and year, without the day', () => {
+    expect(formatBudgetMonthLabel('2026-08-01')).toBe('August 2026')
+  })
+
+  it('discards the day component even when it is not the first of the month', () => {
+    expect(formatBudgetMonthLabel('2026-08-31')).toBe('August 2026')
+  })
+
+  it('never includes a day number in the result', () => {
+    expect(formatBudgetMonthLabel('2026-08-15')).not.toMatch(/\b15\b/)
+  })
+
+  it('always includes the year, even for the current calendar year', () => {
+    const now = new Date()
+    const isoThisYear = `${now.getFullYear()}-03-01`
+    expect(formatBudgetMonthLabel(isoThisYear)).toBe(
+      new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(
+        new Date(now.getFullYear(), 2, 1),
+      ),
+    )
+  })
+
+  it('resolves a december date without rolling into the next year', () => {
+    expect(formatBudgetMonthLabel('2025-12-01')).toBe('December 2025')
   })
 })
 

@@ -77,6 +77,12 @@ export function formatTransactionListDate(dateStr: string): string {
   }).format(date)
 }
 
+export function formatBudgetMonthLabel(monthStr: string): string {
+  const [year, month] = monthStr.split('-').map(Number)
+  const date = new Date(year, month - 1, 1)
+  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date)
+}
+
 export function computeDeltaTone(delta: number | null, higherIsBetter: boolean): DeltaTone {
   if (delta === null || delta === 0) {
     return 'neutral'
