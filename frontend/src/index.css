@@ -32,6 +32,13 @@
   --danger-border: #FECACA;
   --info-soft: #ECFEFF;
 
+  --success: #166534;
+  --success-soft: #ECFDF5;
+
+  --cat-amber: #92400E;
+  --cat-violet: #6D28D9;
+  --neutral-strong: #64748B;
+
   /* Shape & elevation */
   --radius-sm: 8px;
   --radius-md: 12px;
