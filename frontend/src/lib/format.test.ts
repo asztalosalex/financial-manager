@@ -7,6 +7,7 @@ import {
   formatSignedPercent,
   formatSignedPoints,
   formatTransactionDate,
+  formatTransactionListDate,
 } from './format'
 
 describe('formatCurrencyHuf', () => {
@@ -117,6 +118,36 @@ describe('formatTransactionDate', () => {
     const arbitraryToday = new Date(2030, 2, 10)
     expect(formatTransactionDate('2030-03-10', arbitraryToday)).toBe('Today')
     expect(formatTransactionDate('2030-03-09', arbitraryToday)).toBe('Yesterday')
+  })
+})
+
+describe('formatTransactionListDate', () => {
+  it('formats a date with abbreviated month, numeric day and full year', () => {
+    expect(formatTransactionListDate('2026-08-14')).toBe('Aug 14, 2026')
+  })
+
+  it('always includes the year, even for the current calendar year', () => {
+    const now = new Date()
+    const isoThisYear = `${now.getFullYear()}-01-15`
+    expect(formatTransactionListDate(isoThisYear)).toBe(
+      new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(
+        new Date(now.getFullYear(), 0, 15),
+      ),
+    )
+  })
+
+  it('never returns a relative label like Today or Yesterday, even for the current date', () => {
+    const today = new Date()
+    const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+      today.getDate(),
+    ).padStart(2, '0')}`
+    expect(formatTransactionListDate(isoToday)).not.toBe('Today')
+    expect(formatTransactionListDate(isoToday)).not.toBe('Yesterday')
+  })
+
+  it('parses the raw date as a local calendar day, not as UTC', () => {
+    expect(formatTransactionListDate('2026-01-01')).toBe('Jan 1, 2026')
+    expect(formatTransactionListDate('2025-12-31')).toBe('Dec 31, 2025')
   })
 })
 

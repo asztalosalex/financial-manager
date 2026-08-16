@@ -18,6 +18,17 @@ function backendResponse(url: string): Response {
   if (url.startsWith('/api/categories')) {
     return jsonResponse(200, [])
   }
+  if (url.startsWith('/api/transactions')) {
+    return jsonResponse(200, {
+      content: [],
+      page: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+      first: true,
+      last: true,
+    })
+  }
   if (url === '/api/users/count') {
     return jsonResponse(200, 42)
   }
@@ -114,7 +125,9 @@ describe('route structure', () => {
     renderAt('/transactions')
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Transactions' })).toBeInTheDocument()
-    expect(screen.getByText('No income or expense data is available yet.')).toBeInTheDocument()
+    expect(
+      await screen.findByText('No transactions yet. Add your first transaction to get started.'),
+    ).toBeInTheDocument()
   })
 
   it('renders the categories page for a signed-in visitor', async () => {

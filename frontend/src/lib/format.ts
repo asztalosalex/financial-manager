@@ -67,6 +67,16 @@ export function formatTransactionDate(dateStr: string, today: Date): string {
   }).format(date)
 }
 
+export function formatTransactionListDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date)
+}
+
 export function computeDeltaTone(delta: number | null, higherIsBetter: boolean): DeltaTone {
   if (delta === null || delta === 0) {
     return 'neutral'
