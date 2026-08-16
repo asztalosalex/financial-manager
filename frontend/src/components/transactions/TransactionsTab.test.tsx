@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import TransactionsTab from './TransactionsTab'
-import { clearCookies, errorResponse, jsonResponse } from '../../test/helpers'
+import { clearCookies, emptyResponse, errorResponse, jsonResponse } from '../../test/helpers'
 import type { CategoryResponseDto, PageResponse, TransactionResponseDto } from '../../api/types'
 
 type FetchHandler = (url: string, init: RequestInit | undefined) => Response
@@ -93,16 +93,26 @@ const SAMPLE_TRANSACTIONS: TransactionResponseDto[] = [
 ]
 
 interface Routes {
-  transactions?: () => Response
-  categories?: () => Response
+  transactions?: (init: RequestInit | undefined) => Response
+  categories?: (init: RequestInit | undefined) => Response
 }
 
 function mockRoutes(routes: Routes) {
-  mockFetch((url) => {
+  mockFetch((url, init) => {
     if (url.includes('/api/categories/user')) {
-      return (routes.categories ?? (() => jsonResponse(200, CATEGORIES)))()
+      return (routes.categories ?? (() => jsonResponse(200, CATEGORIES)))(init)
     }
-    return (routes.transactions ?? (() => jsonResponse(200, emptyPage())))()
+    return (routes.transactions ?? (() => jsonResponse(200, emptyPage())))(init)
+  })
+}
+
+function formWithin() {
+  return within(document.querySelector('.transaction-form-section') as HTMLElement)
+}
+
+function submitForm(label: string) {
+  return act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: label }))
   })
 }
 
@@ -304,12 +314,12 @@ describe('TransactionsTab', () => {
     expect(screen.getByText('Page 1 of 7 (137 total)')).toBeInTheDocument()
   })
 
-  it('renders no New Transaction button and no per-row action icons', async () => {
+  it('renders the New Transaction button and per-row edit/delete action icons', async () => {
     await renderLoaded(emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 2, totalPages: 1 }))
 
-    expect(screen.queryByRole('button', { name: /New Transaction/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Edit/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Delete/i })).toBeNull()
+    expect(screen.getByRole('button', { name: '+ New Transaction' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit Salary · Aug 1, 2026' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete Salary · Aug 1, 2026' })).toBeInTheDocument()
   })
 
   it('sends the selected category id as a number, not a concatenated string or NaN', async () => {
@@ -369,5 +379,334 @@ describe('TransactionsTab', () => {
       expect(within(list).getByText('August salary')).toBeInTheDocument()
     })
     expect(within(list).queryByText('Groceries')).toBeNull()
+  })
+
+  it('opens the create form with empty fields and today as the default date when New Transaction is clicked', async () => {
+    await renderLoaded(emptyPage())
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+
+    const form = formWithin()
+    expect(form.getByRole('heading', { name: 'Create New Transaction' })).toBeInTheDocument()
+    expect(form.getByLabelText('Type')).toHaveValue('')
+    expect(form.getByLabelText('Category')).toHaveValue('')
+    expect((screen.getByLabelText('Amount') as HTMLInputElement).value).toBe('')
+    expect(screen.getByLabelText('Date')).toHaveValue(new Date().toISOString().slice(0, 10))
+    expect((screen.getByLabelText('Description') as HTMLInputElement).value).toBe('')
+  })
+
+  it('opens the form prefilled with the clicked transaction when its edit icon is clicked', async () => {
+    await renderLoaded(emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 2, totalPages: 1 }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Groceries · Aug 14, 2026' }))
+
+    const form = formWithin()
+    expect(form.getByRole('heading', { name: 'Edit Transaction' })).toBeInTheDocument()
+    expect(form.getByLabelText('Type')).toHaveValue('EXPENSE')
+    expect(form.getByLabelText('Category')).toHaveValue('1')
+    expect((screen.getByLabelText('Amount') as HTMLInputElement).value).toBe('12500')
+    expect(screen.getByLabelText('Date')).toHaveValue('2026-08-14')
+    expect((screen.getByLabelText('Description') as HTMLInputElement).value).toBe('')
+  })
+
+  it('rejects a submit with a required field left empty, without calling the API', async () => {
+    await renderLoaded(emptyPage())
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    const callsBefore = transactionCalls().length
+
+    await submitForm('Create Transaction')
+
+    expect(transactionCalls()).toHaveLength(callsBefore)
+    expect(screen.getByText('Type, category, amount, and date are required')).toHaveClass('auth-error')
+    expect(screen.getByRole('button', { name: 'Create Transaction' })).toBeInTheDocument()
+  })
+
+  it('rejects a non-positive or non-numeric amount, without calling the API', async () => {
+    await renderLoaded(emptyPage())
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    const form = formWithin()
+    fireEvent.change(form.getByLabelText('Type'), { target: { value: 'EXPENSE' } })
+    fireEvent.change(form.getByLabelText('Category'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '-5' } })
+    const callsBefore = transactionCalls().length
+
+    await submitForm('Create Transaction')
+
+    expect(transactionCalls()).toHaveLength(callsBefore)
+    expect(screen.getByText('Amount must be a positive number')).toHaveClass('auth-error')
+  })
+
+  it('creates a transaction with a typed numeric payload, closes the form, shows success, and resets to page 0 from a later page', async () => {
+    await renderLoaded(
+      emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 40, totalPages: 2, first: true, last: false }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }))
+    await waitFor(() => {
+      expect(lastTransactionParams().get('page')).toBe('1')
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    const form = formWithin()
+    fireEvent.change(form.getByLabelText('Type'), { target: { value: 'EXPENSE' } })
+    fireEvent.change(form.getByLabelText('Category'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '250.5' } })
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-08-15' } })
+
+    mockRoutes({
+      transactions: (init) =>
+        init?.method === 'POST'
+          ? jsonResponse(201, {
+              id: 999,
+              type: 'EXPENSE',
+              description: null,
+              categoryId: 1,
+              categoryName: 'Groceries',
+              amount: 250.5,
+              date: '2026-08-15',
+            })
+          : jsonResponse(
+              200,
+              emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 41, totalPages: 3, first: true, last: false }),
+            ),
+    })
+
+    await submitForm('Create Transaction')
+
+    const createCall = transactionCalls().find(([, init]) => init?.method === 'POST')
+    expect(createCall).toBeDefined()
+    expect(JSON.parse((createCall?.[1]?.body as string) ?? '{}')).toEqual({
+      type: 'EXPENSE',
+      categoryId: 1,
+      amount: 250.5,
+      date: '2026-08-15',
+      description: '',
+    })
+
+    expect(screen.getByText('Transaction created successfully')).toHaveClass('auth-success')
+    expect(screen.queryByRole('heading', { name: 'Create New Transaction' })).toBeNull()
+    await waitFor(() => {
+      expect(lastTransactionParams().get('page')).toBe('0')
+    })
+  })
+
+  it('creates a transaction and reloads without changing page when already on page 0', async () => {
+    await renderLoaded(emptyPage())
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    const form = formWithin()
+    fireEvent.change(form.getByLabelText('Type'), { target: { value: 'INCOME' } })
+    fireEvent.change(form.getByLabelText('Category'), { target: { value: '2' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '1000' } })
+
+    mockRoutes({
+      transactions: (init) =>
+        init?.method === 'POST'
+          ? jsonResponse(201, {
+              id: 999,
+              type: 'INCOME',
+              description: null,
+              categoryId: 2,
+              categoryName: 'Salary',
+              amount: 1000,
+              date: new Date().toISOString().slice(0, 10),
+            })
+          : jsonResponse(200, emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 3, totalPages: 1 })),
+    })
+
+    const callsBefore = transactionCalls().length
+    await submitForm('Create Transaction')
+
+    const postCalls = transactionCalls().filter(([, init]) => init?.method === 'POST')
+    expect(postCalls).toHaveLength(1)
+    expect(transactionCalls().length).toBeGreaterThan(callsBefore)
+    expect(screen.getByText('Transaction created successfully')).toHaveClass('auth-success')
+    await screen.findByText('August salary')
+  })
+
+  it('updates a transaction, closes the form, shows success, and reloads the same page', async () => {
+    await renderLoaded(emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 2, totalPages: 1 }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Groceries · Aug 14, 2026' }))
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '13000' } })
+
+    mockRoutes({
+      transactions: (init) =>
+        init?.method === 'PUT'
+          ? jsonResponse(200, { ...SAMPLE_TRANSACTIONS[1], amount: 13000 })
+          : jsonResponse(200, emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 2, totalPages: 1 })),
+    })
+
+    await submitForm('Update Transaction')
+
+    const putCall = transactionCalls().find(([, init]) => init?.method === 'PUT')
+    expect(putCall?.[0]).toBe('/api/transactions/102')
+    expect(JSON.parse((putCall?.[1]?.body as string) ?? '{}')).toEqual({
+      type: 'EXPENSE',
+      categoryId: 1,
+      amount: 13000,
+      date: '2026-08-14',
+      description: '',
+    })
+    expect(screen.getByText('Transaction updated successfully')).toHaveClass('auth-success')
+    expect(screen.queryByRole('heading', { name: 'Edit Transaction' })).toBeNull()
+    await waitFor(() => {
+      expect(lastTransactionParams().get('page')).toBe('0')
+    })
+  })
+
+  it('does not call deleteTransaction when the confirmation is dismissed', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    await renderLoaded(emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 2, totalPages: 1 }))
+    const callsBefore = transactionCalls().length
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Groceries · Aug 14, 2026' }))
+
+    expect(transactionCalls()).toHaveLength(callsBefore)
+    expect(screen.getByText('Groceries · Aug 14, 2026')).toBeInTheDocument()
+  })
+
+  it('reloads the same page after deleting when more than one row remains on that page', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    mockFetch((url, init) => {
+      if (url.includes('/api/categories/user')) {
+        return jsonResponse(200, CATEGORIES)
+      }
+      if (init?.method === 'DELETE') {
+        return emptyResponse(204)
+      }
+      const requestedPage = paramsOf(url).get('page')
+      if (requestedPage === '1') {
+        return jsonResponse(
+          200,
+          emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 22, totalPages: 2, first: false, last: true }),
+        )
+      }
+      return jsonResponse(
+        200,
+        emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 22, totalPages: 2, first: true, last: false }),
+      )
+    })
+
+    render(<TransactionsTab />)
+    await screen.findByText('August salary')
+
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }))
+    await waitFor(() => {
+      expect(lastTransactionParams().get('page')).toBe('1')
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Groceries · Aug 14, 2026' }))
+    })
+
+    expect(transactionCalls().some(([, init]) => init?.method === 'DELETE')).toBe(true)
+    await waitFor(() => {
+      expect(lastTransactionParams().get('page')).toBe('1')
+    })
+    expect(screen.getByText('Transaction deleted successfully')).toHaveClass('auth-success')
+  })
+
+  it('decrements the page when the deleted row was the only row on a page after the first', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    mockFetch((url, init) => {
+      if (url.includes('/api/categories/user')) {
+        return jsonResponse(200, CATEGORIES)
+      }
+      if (init?.method === 'DELETE') {
+        return emptyResponse(204)
+      }
+      const requestedPage = paramsOf(url).get('page')
+      if (requestedPage === '1') {
+        return jsonResponse(
+          200,
+          emptyPage({
+            content: [SAMPLE_TRANSACTIONS[1]],
+            totalElements: 21,
+            totalPages: 2,
+            first: false,
+            last: true,
+          }),
+        )
+      }
+      return jsonResponse(
+        200,
+        emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 21, totalPages: 2, first: true, last: false }),
+      )
+    })
+
+    render(<TransactionsTab />)
+    await screen.findByText('August salary')
+
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }))
+    await screen.findByText('Groceries · Aug 14, 2026')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Groceries · Aug 14, 2026' }))
+    })
+
+    expect(transactionCalls().some(([, init]) => init?.method === 'DELETE')).toBe(true)
+    await waitFor(() => {
+      expect(lastTransactionParams().get('page')).toBe('0')
+    })
+    expect(screen.getByText('Transaction deleted successfully')).toHaveClass('auth-success')
+  })
+
+  it('shows server field errors beside the fields and keeps the form open', async () => {
+    await renderLoaded(emptyPage())
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    const form = formWithin()
+    fireEvent.change(form.getByLabelText('Type'), { target: { value: 'EXPENSE' } })
+    fireEvent.change(form.getByLabelText('Category'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '10' } })
+
+    mockRoutes({
+      transactions: (init) =>
+        init?.method === 'POST'
+          ? errorResponse(400, 'Validation failed', { date: 'date is required' }, '/api/transactions')
+          : jsonResponse(200, emptyPage()),
+    })
+
+    await submitForm('Create Transaction')
+
+    expect(screen.getByText('date is required')).toHaveClass('field-error')
+    expect(screen.getByText('Validation failed')).toHaveClass('auth-error')
+    expect(screen.getByRole('heading', { name: 'Create New Transaction' })).toBeInTheDocument()
+  })
+
+  it('closes the form without an API call and clears unsaved changes on Cancel', async () => {
+    await renderLoaded(emptyPage())
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    fireEvent.change(formWithin().getByLabelText('Type'), { target: { value: 'EXPENSE' } })
+    const callsBefore = transactionCalls().length
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(transactionCalls()).toHaveLength(callsBefore)
+    expect(screen.queryByRole('heading', { name: 'Create New Transaction' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    expect(formWithin().getByLabelText('Type')).toHaveValue('')
+  })
+
+  it('does not filter the form category select by the chosen type, and does not re-fetch categories when the form opens', async () => {
+    await renderLoaded(emptyPage())
+    const categoryCallsBefore = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.filter(([url]) => String(url).includes('/api/categories/user')).length
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    const form = formWithin()
+    fireEvent.change(form.getByLabelText('Type'), { target: { value: 'INCOME' } })
+
+    const options = Array.from((form.getByLabelText('Category') as HTMLSelectElement).options).map(
+      (option) => option.textContent,
+    )
+    expect(options).toEqual(['Select category', 'Groceries', 'Salary'])
+
+    const categoryCallsAfter = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.filter(([url]) => String(url).includes('/api/categories/user')).length
+    expect(categoryCallsAfter).toBe(categoryCallsBefore)
   })
 })

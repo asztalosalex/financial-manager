@@ -51,10 +51,10 @@ describe('Transactions', () => {
     await screen.findByText('No transactions yet. Add your first transaction to get started.')
   })
 
-  it('does not render a New Transaction button in this slice', async () => {
+  it('renders a New Transaction button next to the page heading', async () => {
     render(<Transactions />)
 
     await screen.findByText('No transactions yet. Add your first transaction to get started.')
-    expect(screen.queryByRole('button', { name: /New Transaction/i })).toBeNull()
+    expect(screen.getByRole('button', { name: '+ New Transaction' })).toBeInTheDocument()
   })
 })

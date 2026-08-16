@@ -1,14 +1,28 @@
-import { useEffect, useState } from 'react'
-import { fetchTransactions } from '../../api/transactions'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { createTransaction, deleteTransaction, fetchTransactions, updateTransaction } from '../../api/transactions'
 import { fetchCategories } from '../../api/categories'
 import { isAbortError, toFormError } from '../../api/ApiError'
 import Pagination from '../Pagination'
 import TransactionFilters, { type TransactionFiltersValue } from './TransactionFilters'
 import TransactionRow, { type TransactionRowItem } from './TransactionRow'
+import TransactionForm, { type TransactionFormValues } from './TransactionForm'
 import { formatCurrencyHuf, formatTransactionListDate } from '../../lib/format'
-import type { CategoryResponseDto, PageResponse, TransactionResponseDto } from '../../api/types'
+import type {
+  CategoryResponseDto,
+  CreateTransactionDto,
+  PageResponse,
+  TransactionResponseDto,
+} from '../../api/types'
 
 const EMPTY_FILTERS: TransactionFiltersValue = { type: '', categoryId: '', from: '', to: '' }
+
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function defaultFormValues(): TransactionFormValues {
+  return { type: '', categoryId: '', amount: '', date: todayIsoDate(), description: '' }
+}
 
 function hasActiveFilters(value: TransactionFiltersValue): boolean {
   return value.type !== '' || value.categoryId !== '' || value.from !== '' || value.to !== ''
@@ -29,6 +43,7 @@ function buildTransactionRowItems(page: PageResponse<TransactionResponseDto>): T
       description,
       categoryLabel: `${transaction.categoryName} · ${dateLabel}`,
       amountLabel: `${sign}${formatCurrencyHuf(transaction.amount)}`,
+      source: transaction,
     }
   })
 }
@@ -43,10 +58,16 @@ function TransactionsTab() {
   const [error, setError] = useState('')
   const [categories, setCategories] = useState<CategoryResponseDto[]>([])
 
-  useEffect(() => {
-    const controller = new AbortController()
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [formValues, setFormValues] = useState<TransactionFormValues>(defaultFormValues())
+  const [formError, setFormError] = useState('')
+  const [formFieldErrors, setFormFieldErrors] = useState<Record<string, string>>({})
+  const [formSuccess, setFormSuccess] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-    async function load() {
+  const reload = useCallback(
+    async (signal?: AbortSignal) => {
       setLoading(true)
       try {
         const data = await fetchTransactions(
@@ -59,23 +80,27 @@ function TransactionsTab() {
             categoryId: filters.categoryId === '' ? undefined : filters.categoryId,
             type: filters.type === '' ? undefined : filters.type,
           },
-          controller.signal,
+          signal,
         )
         setTransactionsPage(data)
         setError('')
-        setLoading(false)
       } catch (err) {
         if (isAbortError(err)) {
           return
         }
         setError(toFormError(err).message)
+      } finally {
         setLoading(false)
       }
-    }
+    },
+    [filters, page],
+  )
 
-    void load()
+  useEffect(() => {
+    const controller = new AbortController()
+    void reload(controller.signal)
     return () => controller.abort()
-  }, [filters, page])
+  }, [reload])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -105,16 +130,150 @@ function TransactionsTab() {
     setPage(0)
   }
 
+  const handleOpenCreate = () => {
+    setEditingId(null)
+    setFormValues(defaultFormValues())
+    setFormError('')
+    setFormFieldErrors({})
+    setShowForm(true)
+  }
+
+  const handleEditClick = (transaction: TransactionResponseDto) => {
+    setEditingId(transaction.id)
+    setFormValues({
+      type: transaction.type,
+      categoryId: transaction.categoryId,
+      amount: String(transaction.amount),
+      date: transaction.date,
+      description: transaction.description ?? '',
+    })
+    setFormError('')
+    setFormFieldErrors({})
+    setShowForm(true)
+  }
+
+  const handleCancel = () => {
+    setShowForm(false)
+    setEditingId(null)
+    setFormValues(defaultFormValues())
+    setFormError('')
+    setFormFieldErrors({})
+  }
+
+  const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setFormError('')
+    setFormFieldErrors({})
+    setFormSuccess('')
+
+    const { type, categoryId, amount, date, description } = formValues
+
+    if (type === '' || categoryId === '' || amount.trim() === '' || date === '') {
+      setFormError('Type, category, amount, and date are required')
+      return
+    }
+
+    const parsedAmount = Number(amount)
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setFormError('Amount must be a positive number')
+      return
+    }
+
+    const payload: CreateTransactionDto = {
+      type,
+      categoryId,
+      amount: parsedAmount,
+      date,
+      description,
+    }
+
+    setSubmitting(true)
+    try {
+      if (editingId !== null) {
+        await updateTransaction(editingId, payload)
+        setShowForm(false)
+        setEditingId(null)
+        setFormSuccess('Transaction updated successfully')
+        await reload()
+      } else {
+        await createTransaction(payload)
+        setShowForm(false)
+        setFormSuccess('Transaction created successfully')
+        if (page === 0) {
+          await reload()
+        } else {
+          setPage(0)
+        }
+      }
+    } catch (err) {
+      const parsed = toFormError(err)
+      setFormError(parsed.message)
+      setFormFieldErrors(parsed.fieldErrors)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this transaction?')) {
+      return
+    }
+
+    setFormError('')
+    setFormSuccess('')
+    try {
+      await deleteTransaction(id)
+      setFormSuccess('Transaction deleted successfully')
+      const isOnlyRowOnPage = transactionsPage?.content.length === 1
+      if (isOnlyRowOnPage && page > 0) {
+        setPage(page - 1)
+      } else {
+        await reload()
+      }
+    } catch (err) {
+      setFormError(toFormError(err).message)
+    }
+  }
+
   const activeFilters = hasActiveFilters(filters)
 
   return (
     <>
+      <div className="shell-page-header">
+        <h1>Transactions</h1>
+        <button type="button" className="btn-primary" onClick={handleOpenCreate}>
+          + New Transaction
+        </button>
+      </div>
+
       <TransactionFilters
         value={filters}
         categories={categories}
         onChange={handleFiltersChange}
         onClear={handleClearFilters}
       />
+
+      {formSuccess && (
+        <div className="auth-success" role="status">
+          {formSuccess}
+        </div>
+      )}
+
+      {showForm && (
+        <TransactionForm
+          mode={editingId === null ? 'create' : 'edit'}
+          values={formValues}
+          categories={categories}
+          formError={formError}
+          fieldErrors={formFieldErrors}
+          submitting={submitting}
+          onChange={setFormValues}
+          onSubmit={(e) => {
+            void handleFormSubmit(e)
+          }}
+          onCancel={handleCancel}
+        />
+      )}
 
       {loading && (
         <div className="loading" role="status">
@@ -146,7 +305,14 @@ function TransactionsTab() {
           ) : (
             <ul className="transactions-list" role="list">
               {buildTransactionRowItems(transactionsPage).map((item) => (
-                <TransactionRow key={item.id} item={item} />
+                <TransactionRow
+                  key={item.id}
+                  item={item}
+                  onEdit={handleEditClick}
+                  onDelete={(id) => {
+                    void handleDelete(id)
+                  }}
+                />
               ))}
             </ul>
           )}

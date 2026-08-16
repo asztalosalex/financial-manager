@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchTransactions } from './transactions'
+import { createTransaction, deleteTransaction, fetchTransactions, updateTransaction } from './transactions'
 import { ApiError } from './ApiError'
 import { setUnauthorizedHandler } from './client'
-import { errorResponse, jsonResponse } from '../test/helpers'
-import type { PageResponse, TransactionResponseDto } from './types'
+import { emptyResponse, errorResponse, jsonResponse } from '../test/helpers'
+import type { CreateTransactionDto, PageResponse, TransactionResponseDto } from './types'
 
 const FIRST_PAGE: PageResponse<TransactionResponseDto> = {
   content: [
@@ -175,5 +175,95 @@ describe('transactions api', () => {
     expect(apiError.message).toBe('Validation failed')
     expect(apiError.fieldErrors).toEqual({ size: 'size must be between 1 and 100' })
     expect(requestedUrl()).toBe('/api/transactions?size=500')
+  })
+
+  it('posts a new transaction to the collection path and returns the created copy', async () => {
+    const created: TransactionResponseDto = {
+      id: 200,
+      type: 'EXPENSE',
+      description: 'Weekly shop',
+      categoryId: 1,
+      categoryName: 'Groceries',
+      amount: 42.5,
+      date: '2026-08-14',
+    }
+    respondWith(created)
+    const payload: CreateTransactionDto = {
+      type: 'EXPENSE',
+      description: 'Weekly shop',
+      categoryId: 1,
+      amount: 42.5,
+      date: '2026-08-14',
+    }
+
+    const result = await createTransaction(payload)
+
+    expect(requestedUrl()).toBe('/api/transactions')
+    const [, init] = lastCall()
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse(init?.body as string)).toEqual(payload)
+    expect(result).toEqual(created)
+  })
+
+  it('puts a full replacement to the transaction id path and returns the updated copy', async () => {
+    const updated: TransactionResponseDto = {
+      id: 11,
+      type: 'INCOME',
+      description: 'Bonus',
+      categoryId: 2,
+      categoryName: 'Salary',
+      amount: 100000,
+      date: '2026-08-01',
+    }
+    respondWith(updated)
+    const payload: CreateTransactionDto = {
+      type: 'INCOME',
+      description: 'Bonus',
+      categoryId: 2,
+      amount: 100000,
+      date: '2026-08-01',
+    }
+
+    const result = await updateTransaction(11, payload)
+
+    expect(requestedUrl()).toBe('/api/transactions/11')
+    const [, init] = lastCall()
+    expect(init?.method).toBe('PUT')
+    expect(JSON.parse(init?.body as string)).toEqual(payload)
+    expect(result).toEqual(updated)
+  })
+
+  it('deletes a transaction at its id path and resolves without a body', async () => {
+    vi.mocked(globalThis.fetch).mockImplementation(() => Promise.resolve(emptyResponse(204)))
+
+    const result = await deleteTransaction(11)
+
+    expect(requestedUrl()).toBe('/api/transactions/11')
+    const [, init] = lastCall()
+    expect(init?.method).toBe('DELETE')
+    expect(result).toBeNull()
+  })
+
+  it('raises server-side validation errors from create as an ApiError with field keys', async () => {
+    vi.mocked(globalThis.fetch).mockImplementation(() =>
+      Promise.resolve(
+        errorResponse(
+          400,
+          'Validation failed',
+          { amount: 'amount must be greater than 0' },
+          '/api/transactions',
+        ),
+      ),
+    )
+
+    const caught = await createTransaction({
+      type: 'EXPENSE',
+      categoryId: 1,
+      amount: -5,
+      date: '2026-08-14',
+    }).catch((error: unknown) => error)
+
+    expect(caught).toBeInstanceOf(ApiError)
+    expect((caught as ApiError).fieldErrors).toEqual({ amount: 'amount must be greater than 0' })
   })
 })

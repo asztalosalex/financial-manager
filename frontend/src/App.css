@@ -1820,6 +1820,64 @@
   color: var(--text);
 }
 
+.transaction-row-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex: none;
+}
+
+.transaction-form-section {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+}
+
+.transaction-form-section h3 {
+  font-size: 1.05rem;
+  margin: 0 0 1.25rem;
+}
+
+.transaction-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.transaction-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0;
+}
+
+.transaction-form label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.transaction-form select,
+.transaction-form input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  max-width: 400px;
+}
+
+.transaction-form select:focus,
+.transaction-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 .pagination {
   display: flex;
   align-items: center;

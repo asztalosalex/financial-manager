@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { PageResponse, TransactionResponseDto, TransactionType } from './types'
+import type { CreateTransactionDto, PageResponse, TransactionResponseDto, TransactionType } from './types'
 
 export type TransactionSortField = 'date' | 'amount' | 'id'
 
@@ -62,4 +62,19 @@ export function fetchTransactions(
     `${TRANSACTIONS_PATH}${buildQueryString(query)}`,
     { signal },
   )
+}
+
+export function createTransaction(payload: CreateTransactionDto): Promise<TransactionResponseDto> {
+  return api.post<TransactionResponseDto>(TRANSACTIONS_PATH, payload)
+}
+
+export function updateTransaction(
+  id: number,
+  payload: CreateTransactionDto,
+): Promise<TransactionResponseDto> {
+  return api.put<TransactionResponseDto>(`${TRANSACTIONS_PATH}/${id}`, payload)
+}
+
+export function deleteTransaction(id: number): Promise<void> {
+  return api.delete<void>(`${TRANSACTIONS_PATH}/${id}`)
 }
