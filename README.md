@@ -14,18 +14,26 @@ financial-manager/
 │   │   ├── service/              # Business logic
 │   │   ├── repository/           # Spring Data JPA repositories + specifications
 │   │   ├── model/                 # JPA entities
-│   │   ├── dto/                   # Request/response DTOs per domain
-│   │   ├── security/              # JWT + CSRF cookie handling
+│   │   ├── dto/                   # Request/response DTOs per domain (incl. dto/common/PageResponse)
+│   │   ├── mapper/                 # Entity <-> DTO mappers
+│   │   ├── security/              # JWT + CSRF cookie handling (CsrfCookieFilter lives here)
+│   │   ├── filter/                 # Servlet filters outside the security chain (JwtAuthenticationFilter)
+│   │   ├── config/                  # SecurityConfig, FilterRegistrationConfig, SwaggerConfig
+│   │   ├── responses/               # Cross-cutting response shapes (e.g. LoginResponse)
+│   │   ├── web/                      # Request-layer helpers (e.g. SortWhitelist)
 │   │   └── exception/              # Domain exceptions + global handler
 │   ├── src/main/resources/db/migration/  # Flyway SQL migrations
 │   ├── src/test/                 # Unit + integration tests (Testcontainers)
 │   └── Dockerfile
 ├── frontend/                    # React + TypeScript SPA
 │   ├── src/
-│   │   ├── pages/                 # Route-level views (Dashboard, Transactions, Categories, Settings, Login, Register)
-│   │   ├── components/            # Reusable UI + layout components
+│   │   ├── pages/                 # Route-level views (Dashboard, Transactions, Categories, Settings, Login, Register, Home)
+│   │   ├── components/            # Reusable UI + layout components (incl. components/layout, components/dashboard)
 │   │   ├── api/                    # Typed fetch client per domain
-│   │   └── auth/                    # Auth context/provider, route guarding
+│   │   ├── auth/                    # Auth context/provider, route guarding
+│   │   ├── lib/                      # Pure presentation-adjacent helpers (formatting, chart math)
+│   │   ├── hooks/                     # Reusable React hooks (e.g. useMediaQuery)
+│   │   └── test/                       # Shared test utilities (e.g. matchMedia mock)
 │   └── Dockerfile
 ├── nginx.conf                   # HTTPS reverse proxy for frontend + backend
 ├── docker-compose.yml           # Full-stack orchestration (db, backend, frontend, nginx)
