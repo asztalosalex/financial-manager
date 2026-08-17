@@ -13,8 +13,8 @@ const USER: UserResponseDto = {
   lastLogin: null,
 }
 
-const NAV_LABELS = ['Overview', 'Transactions', 'Categories', 'Budgets', 'Settings']
-const NAV_HREFS = ['/dashboard', '/transactions', '/categories', '/budgets', '/settings']
+const NAV_LABELS = ['Overview', 'Transactions', 'Categories', 'Budgets', 'Reports', 'Settings']
+const NAV_HREFS = ['/dashboard', '/transactions', '/categories', '/budgets', '/reports', '/settings']
 
 function renderSidebar(path = '/dashboard', overrides: Partial<AuthContextValue> = {}) {
   const auth: AuthContextValue = {
@@ -48,7 +48,7 @@ function navLinks(): HTMLElement[] {
 }
 
 describe('Sidebar', () => {
-  it('lists the four destinations in the agreed order', () => {
+  it('lists the six destinations in the agreed order', () => {
     renderSidebar()
 
     expect(navLinks().map((link) => link.textContent)).toEqual(NAV_LABELS)
@@ -60,15 +60,33 @@ describe('Sidebar', () => {
     expect(navLinks().map((link) => link.getAttribute('href'))).toEqual(NAV_HREFS)
   })
 
-  it('shows no destination that has no page behind it', () => {
+  it('shows exactly six destinations, no more and no fewer', () => {
     renderSidebar()
 
-    expect(navLinks()).toHaveLength(5)
-    expect(screen.queryByRole('link', { name: 'Reports' })).not.toBeInTheDocument()
-    expect(screen.queryByText('Reports')).not.toBeInTheDocument()
+    expect(navLinks()).toHaveLength(6)
   })
 
-  it('points the Budgets nav item at /budgets, between Categories and Settings', () => {
+  it('points the Reports nav item at /reports, between Budgets and Settings, with the report-chart icon', () => {
+    renderSidebar()
+
+    const reportsLink = screen.getByRole('link', { name: 'Reports' })
+    expect(reportsLink).toHaveAttribute('href', '/reports')
+    expect(navLinks().map((link) => link.textContent)).toEqual([
+      'Overview',
+      'Transactions',
+      'Categories',
+      'Budgets',
+      'Reports',
+      'Settings',
+    ])
+
+    const svgPaths = Array.from(reportsLink.querySelectorAll('svg path')).map((path) =>
+      path.getAttribute('d'),
+    )
+    expect(svgPaths).toEqual(['M3 3v18h18', 'M7 15l4-5 3 3 5-7'])
+  })
+
+  it('points the Budgets nav item at /budgets, between Categories and Reports', () => {
     renderSidebar()
 
     expect(screen.getByRole('link', { name: 'Budgets' })).toHaveAttribute('href', '/budgets')
@@ -77,6 +95,7 @@ describe('Sidebar', () => {
       'Transactions',
       'Categories',
       'Budgets',
+      'Reports',
       'Settings',
     ])
   })
@@ -119,7 +138,7 @@ describe('Sidebar', () => {
     expect(list.tagName).toBe('UL')
 
     const items = within(list).getAllByRole('listitem')
-    expect(items).toHaveLength(5)
+    expect(items).toHaveLength(6)
     items.forEach((item) => {
       expect(item.tagName).toBe('LI')
       expect(within(item).getByRole('link')).toBeInTheDocument()

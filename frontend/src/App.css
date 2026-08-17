@@ -243,6 +243,35 @@
   font-weight: 400;
 }
 
+.month-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.month-picker label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.month-picker input[type='month'] {
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.month-picker input[type='month']:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 /* ==================================== */
 /* Stat cards                           */
 /* ==================================== */
@@ -579,6 +608,129 @@
 .breakdown-fill {
   height: 100%;
   border-radius: 4px;
+}
+
+.budget-status-card {
+  gap: 15px;
+  padding: 22px;
+}
+
+.budget-status-totals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex: none;
+}
+
+.budget-status-totals-item {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.budget-status-totals-item strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.budget-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.budget-status-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.budget-status-item-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.budget-status-item-label {
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.budget-status-item-amounts {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.budget-status-item-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.budget-status-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.budget-status-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.budget-status-fill--accent {
+  background: var(--accent);
+}
+
+.budget-status-fill--danger {
+  background: var(--danger);
+}
+
+.budget-status-item-percentage {
+  flex: none;
+  min-width: 42px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.budget-status-item-percentage--accent {
+  color: var(--accent);
+}
+
+.budget-status-item-percentage--danger {
+  color: var(--danger);
+}
+
+.budget-status-item-percentage--empty {
+  flex: 1;
+  text-align: left;
+  color: var(--text-3);
+}
+
+.budget-status-item-remaining {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.budget-status-item-remaining--success {
+  color: var(--success);
+}
+
+.budget-status-item-remaining--danger {
+  color: var(--danger);
+}
+
+.budget-status-unbudgeted {
+  color: var(--text-2);
+  font-size: 12.5px;
 }
 
 /* ==================================== */

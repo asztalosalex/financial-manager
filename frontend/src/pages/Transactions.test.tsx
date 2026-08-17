@@ -1,8 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import Transactions from './Transactions'
 import { jsonResponse } from '../test/helpers'
 import type { PageResponse, TransactionResponseDto } from '../api/types'
+
+function renderTransactions() {
+  return render(
+    <MemoryRouter>
+      <Transactions />
+    </MemoryRouter>,
+  )
+}
 
 const EMPTY_PAGE: PageResponse<TransactionResponseDto> = {
   content: [],
@@ -31,7 +40,7 @@ describe('Transactions', () => {
   })
 
   it('names the page with a single first level heading', async () => {
-    render(<Transactions />)
+    renderTransactions()
 
     const headings = screen.getAllByRole('heading', { level: 1 })
     expect(headings).toHaveLength(1)
@@ -41,7 +50,7 @@ describe('Transactions', () => {
   })
 
   it('renders the filter bar and the transaction list surface', async () => {
-    render(<Transactions />)
+    renderTransactions()
 
     expect(screen.getByLabelText('Type')).toBeInTheDocument()
     expect(screen.getByLabelText('Category')).toBeInTheDocument()
@@ -52,7 +61,7 @@ describe('Transactions', () => {
   })
 
   it('renders a New Transaction button next to the page heading', async () => {
-    render(<Transactions />)
+    renderTransactions()
 
     await screen.findByText('No transactions yet. Add your first transaction to get started.')
     expect(screen.getByRole('button', { name: '+ New Transaction' })).toBeInTheDocument()

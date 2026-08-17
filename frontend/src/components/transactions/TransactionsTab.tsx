@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { createTransaction, deleteTransaction, fetchTransactions, updateTransaction } from '../../api/transactions'
 import { fetchCategories } from '../../api/categories'
 import { isAbortError, toFormError } from '../../api/ApiError'
@@ -49,6 +50,7 @@ function buildTransactionRowItems(page: PageResponse<TransactionResponseDto>): T
 }
 
 function TransactionsTab() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [filters, setFilters] = useState<TransactionFiltersValue>(EMPTY_FILTERS)
   const [page, setPage] = useState(0)
   const [transactionsPage, setTransactionsPage] = useState<PageResponse<TransactionResponseDto> | null>(
@@ -119,6 +121,24 @@ function TransactionsTab() {
     void loadCategories()
     return () => controller.abort()
   }, [])
+
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setEditingId(null)
+      setFormValues(defaultFormValues())
+      setFormError('')
+      setFormFieldErrors({})
+      setShowForm(true)
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('new')
+          return next
+        },
+        { replace: true },
+      )
+    }
+  }, [searchParams, setSearchParams])
 
   const handleFiltersChange = (next: TransactionFiltersValue) => {
     setFilters(next)

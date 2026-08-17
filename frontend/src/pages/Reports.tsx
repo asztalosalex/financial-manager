@@ -1,41 +1,39 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import StatCard from '../components/dashboard/StatCard'
 import TrendChart, { type TrendChartPoint } from '../components/dashboard/TrendChart'
 import CategoryDonut, {
   type DonutLegendItem,
 } from '../components/dashboard/CategoryDonut'
-import CategoryBreakdown, {
-  type CategoryBreakdownItem,
-} from '../components/dashboard/CategoryBreakdown'
-import RecentTransactions, {
-  type RecentTransactionItem,
-} from '../components/dashboard/RecentTransactions'
-import { fetchReportsCategories, fetchReportsSummary, fetchReportsTrend } from '../api/reports'
-import { fetchTransactions } from '../api/transactions'
+import MonthPicker from '../components/reports/MonthPicker'
+import BudgetStatusList, {
+  type BudgetStatusRowItem,
+} from '../components/reports/BudgetStatusList'
+import {
+  fetchReportsBudgetStatus,
+  fetchReportsCategories,
+  fetchReportsSummary,
+  fetchReportsTrend,
+} from '../api/reports'
 import { isAbortError, toFormError } from '../api/ApiError'
 import {
   buildDonutSlices,
   buildDonutStops,
-  colorizeCategories,
   computeBarHeightPx,
   formatMonthLabel,
   type DonutStop,
 } from '../lib/charts'
 import {
   computeDeltaTone,
+  formatBudgetMonthLabel,
   formatCurrencyHuf,
-  formatHeaderDate,
   formatPercent,
   formatSignedPercent,
   formatSignedPoints,
-  formatTransactionDate,
 } from '../lib/format'
 import type {
+  BudgetStatusResponse,
   CategoryReportResponse,
-  PageResponse,
   ReportsSummaryResponse,
-  TransactionResponseDto,
   TrendReportResponse,
 } from '../api/types'
 
@@ -97,6 +95,10 @@ function SavingsRateIcon() {
   )
 }
 
+function currentMonthIso(): string {
+  return new Date().toISOString().slice(0, 7)
+}
+
 function buildDeltaText(delta: number | null, formatter: (value: number) => string): string | null {
   if (delta === null) {
     return null
@@ -136,40 +138,33 @@ function buildDonutLegend(categories: CategoryReportResponse): DonutLegendItem[]
   }))
 }
 
-function buildBreakdownItems(categories: CategoryReportResponse): CategoryBreakdownItem[] {
-  const colored = colorizeCategories(categories.categories, CATEGORY_PALETTE)
-  return colored.map((category) => ({
-    color: category.color,
-    label: category.categoryName,
-    amountLabel: formatCurrencyHuf(category.total),
-    percentage: category.percentage ?? 0,
-  }))
-}
+function buildBudgetStatusItems(status: BudgetStatusResponse): BudgetStatusRowItem[] {
+  return status.categories.map((item) => {
+    const barTone: 'accent' | 'danger' =
+      item.percentageUsed !== null && item.percentageUsed > 100 ? 'danger' : 'accent'
+    const remainingTone: 'success' | 'danger' = item.remaining >= 0 ? 'success' : 'danger'
+    const remainingLabel =
+      item.remaining >= 0
+        ? `${formatCurrencyHuf(item.remaining)} left`
+        : `${formatCurrencyHuf(Math.abs(item.remaining))} over`
 
-function buildRecentTransactionItems(
-  page: PageResponse<TransactionResponseDto>,
-  today: Date,
-): RecentTransactionItem[] {
-  return page.content.map((transaction) => {
-    const isIncome = transaction.type === 'INCOME'
-    const description =
-      transaction.description !== null && transaction.description.length > 0
-        ? transaction.description
-        : transaction.categoryName
-    const dateLabel = formatTransactionDate(transaction.date, today)
-    const sign = isIncome ? '+' : '−'
     return {
-      id: transaction.id,
-      isIncome,
-      description,
-      categoryLabel: `${transaction.categoryName} · ${dateLabel}`,
-      amountLabel: `${sign}${formatCurrencyHuf(transaction.amount)}`,
+      categoryId: item.categoryId,
+      categoryName: item.categoryName,
+      budgetedLabel: formatCurrencyHuf(item.budgeted),
+      spentLabel: formatCurrencyHuf(item.spent),
+      remainingLabel,
+      remainingTone,
+      percentageLabel: item.percentageUsed === null ? '—' : formatPercent(item.percentageUsed),
+      barWidthPercent: Math.min(Math.max(item.percentageUsed ?? 0, 0), 100),
+      barTone,
     }
   })
 }
 
-function Dashboard() {
-  const navigate = useNavigate()
+function Reports() {
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthIso())
+
   const [summary, setSummary] = useState<ReportsSummaryResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -179,18 +174,17 @@ function Dashboard() {
   const [chartsLoading, setChartsLoading] = useState(true)
   const [chartsError, setChartsError] = useState('')
 
-  const [transactionsPage, setTransactionsPage] = useState<PageResponse<TransactionResponseDto> | null>(
-    null,
-  )
-  const [transactionsLoading, setTransactionsLoading] = useState(true)
-  const [transactionsError, setTransactionsError] = useState('')
+  const [budgetStatus, setBudgetStatus] = useState<BudgetStatusResponse | null>(null)
+  const [budgetStatusLoading, setBudgetStatusLoading] = useState(true)
+  const [budgetStatusError, setBudgetStatusError] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
+    setLoading(true)
 
     async function load() {
       try {
-        const data = await fetchReportsSummary({}, controller.signal)
+        const data = await fetchReportsSummary({ month: selectedMonth }, controller.signal)
         setSummary(data)
         setError('')
       } catch (err) {
@@ -205,16 +199,17 @@ function Dashboard() {
 
     void load()
     return () => controller.abort()
-  }, [])
+  }, [selectedMonth])
 
   useEffect(() => {
     const controller = new AbortController()
+    setChartsLoading(true)
 
     async function load() {
       try {
         const [categories, trend] = await Promise.all([
-          fetchReportsCategories({}, controller.signal),
-          fetchReportsTrend({ months: 6 }, controller.signal),
+          fetchReportsCategories({ month: selectedMonth }, controller.signal),
+          fetchReportsTrend({ month: selectedMonth, months: 6 }, controller.signal),
         ])
         setCategoryReport(categories)
         setTrendReport(trend)
@@ -231,52 +226,41 @@ function Dashboard() {
 
     void load()
     return () => controller.abort()
-  }, [])
+  }, [selectedMonth])
 
   useEffect(() => {
     const controller = new AbortController()
+    setBudgetStatusLoading(true)
 
     async function load() {
       try {
-        const data = await fetchTransactions(
-          { page: 0, size: 5, sort: 'date,desc' },
-          controller.signal,
-        )
-        setTransactionsPage(data)
-        setTransactionsError('')
+        const data = await fetchReportsBudgetStatus({ month: selectedMonth }, controller.signal)
+        setBudgetStatus(data)
+        setBudgetStatusError('')
       } catch (err) {
         if (isAbortError(err)) {
           return
         }
-        setTransactionsError(toFormError(err).message)
+        setBudgetStatusError(toFormError(err).message)
       } finally {
-        setTransactionsLoading(false)
+        setBudgetStatusLoading(false)
       }
     }
 
     void load()
     return () => controller.abort()
-  }, [])
+  }, [selectedMonth])
 
   return (
     <div className="shell-page">
       <div className="shell-page-header">
-        <div>
-          <h1>Overview</h1>
-          <p className="shell-page-date">{formatHeaderDate(new Date())}</p>
-        </div>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => navigate('/transactions?new=true')}
-        >
-          + New Transaction
-        </button>
+        <h1>Reports</h1>
+        <MonthPicker value={selectedMonth} onChange={setSelectedMonth} />
       </div>
 
       {loading && (
         <div className="loading" role="status">
-          Loading your overview...
+          Loading your report...
         </div>
       )}
 
@@ -353,40 +337,34 @@ function Dashboard() {
         </div>
       )}
 
-      <div className="dashboard-bottom">
-        <div className="dashboard-bottom-col">
-          {transactionsLoading && (
-            <div className="loading" role="status">
-              Loading your recent transactions...
-            </div>
-          )}
-
-          {!transactionsLoading && transactionsError && (
-            <div className="auth-error" role="alert">
-              {transactionsError}
-            </div>
-          )}
-
-          {!transactionsLoading && !transactionsError && transactionsPage && (
-            <RecentTransactions
-              items={buildRecentTransactionItems(transactionsPage, new Date())}
-              isEmpty={transactionsPage.content.length === 0}
-              viewAllHref="/transactions"
-            />
-          )}
+      {budgetStatusLoading && (
+        <div className="loading" role="status">
+          Loading your budget status...
         </div>
+      )}
 
-        <div className="dashboard-bottom-col">
-          {!chartsLoading && !chartsError && categoryReport && (
-            <CategoryBreakdown
-              items={buildBreakdownItems(categoryReport)}
-              isEmpty={categoryReport.categories.length === 0}
-            />
-          )}
+      {!budgetStatusLoading && budgetStatusError && (
+        <div className="auth-error" role="alert">
+          {budgetStatusError}
         </div>
-      </div>
+      )}
+
+      {!budgetStatusLoading && !budgetStatusError && budgetStatus && (
+        <BudgetStatusList
+          items={buildBudgetStatusItems(budgetStatus)}
+          totalBudgetedLabel={formatCurrencyHuf(budgetStatus.totalBudgeted)}
+          totalSpentLabel={formatCurrencyHuf(budgetStatus.totalSpent)}
+          unbudgetedSpendingLabel={
+            budgetStatus.unbudgetedSpending > 0
+              ? formatCurrencyHuf(budgetStatus.unbudgetedSpending)
+              : null
+          }
+          monthLabel={formatBudgetMonthLabel(selectedMonth)}
+          isEmpty={budgetStatus.categories.length === 0}
+        />
+      )}
     </div>
   )
 }
 
-export default Dashboard
+export default Reports

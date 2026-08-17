@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
 import TransactionsTab from './TransactionsTab'
 import { clearCookies, emptyResponse, errorResponse, jsonResponse } from '../../test/helpers'
 import type { CategoryResponseDto, PageResponse, TransactionResponseDto } from '../../api/types'
@@ -116,9 +117,26 @@ function submitForm(label: string) {
   })
 }
 
-async function renderLoaded(transactionsPage: PageResponse<TransactionResponseDto>) {
+function SearchParamsProbe() {
+  const [params] = useSearchParams()
+  return <div data-testid="search-probe">{params.toString()}</div>
+}
+
+function renderTab(initialEntries: string[] = ['/transactions']) {
+  return render(
+    <MemoryRouter initialEntries={initialEntries}>
+      <TransactionsTab />
+      <SearchParamsProbe />
+    </MemoryRouter>,
+  )
+}
+
+async function renderLoaded(
+  transactionsPage: PageResponse<TransactionResponseDto>,
+  initialEntries: string[] = ['/transactions'],
+) {
   mockRoutes({ transactions: () => jsonResponse(200, transactionsPage) })
-  render(<TransactionsTab />)
+  renderTab(initialEntries)
   await waitFor(() => {
     expect(screen.queryByRole('status')).toBeNull()
   })
@@ -138,7 +156,7 @@ describe('TransactionsTab', () => {
   it('shows a loading indicator until transactions arrive, with the filter bar visible and no list or pagination', () => {
     vi.mocked(globalThis.fetch).mockReturnValue(new Promise<Response>(() => {}))
 
-    render(<TransactionsTab />)
+    renderTab()
 
     expect(screen.getByRole('status')).toHaveTextContent('Loading transactions...')
     expect(screen.getByLabelText('Type')).toBeInTheDocument()
@@ -168,7 +186,7 @@ describe('TransactionsTab', () => {
       return jsonResponse(200, emptyPage())
     })
 
-    const { unmount } = render(<TransactionsTab />)
+    const { unmount } = renderTab()
     unmount()
 
     expect(capturedSignal?.aborted).toBe(true)
@@ -216,7 +234,7 @@ describe('TransactionsTab', () => {
 
   it('surfaces the server error message and hides the list and pagination', async () => {
     mockRoutes({ transactions: () => errorResponse(400, 'from must not be after to') })
-    render(<TransactionsTab />)
+    renderTab()
 
     await waitFor(() => {
       expect(screen.getByText('from must not be after to')).toHaveClass('auth-error')
@@ -238,7 +256,7 @@ describe('TransactionsTab', () => {
       transactions: () => jsonResponse(200, emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 2, totalPages: 1 })),
       categories: () => errorResponse(500, 'Categories are temporarily unavailable'),
     })
-    render(<TransactionsTab />)
+    renderTab()
 
     await screen.findByText('August salary')
 
@@ -347,7 +365,7 @@ describe('TransactionsTab', () => {
       return entry.promise
     })
 
-    render(<TransactionsTab />)
+    renderTab()
 
     await waitFor(() => {
       expect(deferred).toHaveLength(1)
@@ -588,7 +606,7 @@ describe('TransactionsTab', () => {
       )
     })
 
-    render(<TransactionsTab />)
+    renderTab()
     await screen.findByText('August salary')
 
     fireEvent.click(screen.getByRole('button', { name: /Next/ }))
@@ -635,7 +653,7 @@ describe('TransactionsTab', () => {
       )
     })
 
-    render(<TransactionsTab />)
+    renderTab()
     await screen.findByText('August salary')
 
     fireEvent.click(screen.getByRole('button', { name: /Next/ }))
@@ -708,5 +726,134 @@ describe('TransactionsTab', () => {
       .mocked(globalThis.fetch)
       .mock.calls.filter(([url]) => String(url).includes('/api/categories/user')).length
     expect(categoryCallsAfter).toBe(categoryCallsBefore)
+  })
+
+  it('auto-opens the create form when the URL has ?new=true on mount', async () => {
+    await renderLoaded(emptyPage(), ['/transactions?new=true'])
+
+    const form = formWithin()
+    expect(form.getByRole('heading', { name: 'Create New Transaction' })).toBeInTheDocument()
+    expect(form.getByLabelText('Type')).toHaveValue('')
+    expect(form.getByLabelText('Category')).toHaveValue('')
+    expect((screen.getByLabelText('Amount') as HTMLInputElement).value).toBe('')
+    expect(screen.getByLabelText('Date')).toHaveValue(new Date().toISOString().slice(0, 10))
+    expect((screen.getByLabelText('Description') as HTMLInputElement).value).toBe('')
+  })
+
+  it('does not auto-open the form when there is no query param on load', async () => {
+    await renderLoaded(emptyPage())
+
+    expect(screen.queryByRole('heading', { name: 'Create New Transaction' })).toBeNull()
+    expect(document.querySelector('.transaction-form-section')).toBeNull()
+  })
+
+  it('strips the new query param from the URL after auto-opening the form', async () => {
+    await renderLoaded(emptyPage(), ['/transactions?new=true'])
+
+    await waitFor(() => {
+      expect(screen.getByTestId('search-probe')).toHaveTextContent('')
+    })
+    expect(screen.getByTestId('search-probe').textContent).not.toContain('new')
+  })
+
+  it('replaces the ?new=true history entry instead of pushing, so Back skips it', async () => {
+    mockRoutes({})
+
+    function BackButton() {
+      const navigate = useNavigate()
+      return (
+        <button type="button" onClick={() => navigate(-1)}>
+          go back
+        </button>
+      )
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard', '/transactions?new=true']} initialIndex={1}>
+        <Routes>
+          <Route path="/dashboard" element={<div>Dashboard page</div>} />
+          <Route
+            path="/transactions"
+            element={
+              <>
+                <TransactionsTab />
+                <BackButton />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Create New Transaction' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'go back' }))
+
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument()
+  })
+
+  it('keeps the form closed on unrelated rerenders after the new param is consumed, without looping', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await renderLoaded(emptyPage(), ['/transactions?new=true'])
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Create New Transaction' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('heading', { name: 'Create New Transaction' })).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'INCOME' } })
+    await waitFor(() => {
+      expect(lastTransactionParams().get('type')).toBe('INCOME')
+    })
+
+    expect(screen.queryByRole('heading', { name: 'Create New Transaction' })).toBeNull()
+    const loopErrors = consoleErrorSpy.mock.calls.filter(([message]) =>
+      String(message).includes('Maximum update depth exceeded'),
+    )
+    expect(loopErrors).toHaveLength(0)
+
+    consoleErrorSpy.mockRestore()
+  })
+
+  it('does not reopen the form when an unrelated query param appears in the URL', async () => {
+    mockRoutes({})
+
+    function AddUnrelatedParam() {
+      const [, setUnrelatedSearchParams] = useSearchParams()
+      return (
+        <button type="button" onClick={() => setUnrelatedSearchParams({ foo: 'bar' })}>
+          add unrelated param
+        </button>
+      )
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/transactions']}>
+        <TransactionsTab />
+        <AddUnrelatedParam />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).toBeNull()
+    })
+    expect(screen.queryByRole('heading', { name: 'Create New Transaction' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'add unrelated param' }))
+
+    expect(screen.queryByRole('heading', { name: 'Create New Transaction' })).toBeNull()
+  })
+
+  it('still opens the create form from its own New Transaction button when there is no query param', async () => {
+    await renderLoaded(emptyPage())
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+
+    const form = formWithin()
+    expect(form.getByRole('heading', { name: 'Create New Transaction' })).toBeInTheDocument()
   })
 })

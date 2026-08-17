@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import Dashboard from './Dashboard'
 import { clearCookies, errorResponse, jsonResponse } from '../test/helpers'
 import { formatHeaderDate } from '../lib/format'
@@ -569,5 +569,43 @@ describe('Dashboard', () => {
 
     const link = screen.getByRole('link', { name: 'View all' })
     expect(link).toHaveAttribute('href', '/transactions')
+  })
+
+  it('navigates to /transactions?new=true when + New Transaction is clicked', async () => {
+    mockFetchRouted({})
+
+    function LocationProbe() {
+      const location = useLocation()
+      return <div data-testid="location-probe">{location.pathname + location.search}</div>
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/transactions" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await screen.findByText('Balance')
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+
+    expect(await screen.findByTestId('location-probe')).toHaveTextContent(
+      '/transactions?new=true',
+    )
+  })
+
+  it('wraps the title and date in a column separate from the New Transaction button', async () => {
+    await renderLoaded(FULL_SUMMARY)
+
+    const header = document.querySelector('.shell-page-header') as HTMLElement
+    const heading = screen.getByRole('heading', { level: 1 })
+    const button = screen.getByRole('button', { name: '+ New Transaction' })
+
+    expect(button.parentElement).toBe(header)
+    expect(heading.parentElement).not.toBe(header)
+    expect(heading.parentElement?.parentElement).toBe(header)
+    expect(heading.parentElement).not.toBe(button.parentElement)
   })
 })

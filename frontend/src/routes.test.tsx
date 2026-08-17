@@ -4,7 +4,12 @@ import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { routes } from './routes'
 import { setUnauthorizedHandler } from './api/client'
 import { emptyResponse, jsonResponse } from './test/helpers'
-import type { UserResponseDto } from './api/types'
+import type {
+  CategoryReportResponse,
+  ReportsSummaryResponse,
+  TrendReportResponse,
+  UserResponseDto,
+} from './api/types'
 
 const USER: UserResponseDto = {
   id: 7,
@@ -14,7 +19,37 @@ const USER: UserResponseDto = {
   lastLogin: null,
 }
 
+const REPORTS_SUMMARY: ReportsSummaryResponse = {
+  month: '2026-08',
+  previousMonth: '2026-07',
+  balance: { current: 0, previous: 0, deltaPercent: null },
+  income: { current: 0, previous: 0, deltaPercent: null },
+  expense: { current: 0, previous: 0, deltaPercent: null },
+  savingsRate: { current: null, previous: null, deltaPoints: null },
+}
+
+const REPORTS_CATEGORIES: CategoryReportResponse = {
+  month: '2026-08',
+  total: 0,
+  categories: [],
+}
+
+const REPORTS_TREND: TrendReportResponse = {
+  month: '2026-08',
+  months: 6,
+  points: [],
+}
+
 function backendResponse(url: string): Response {
+  if (url.startsWith('/api/reports/summary')) {
+    return jsonResponse(200, REPORTS_SUMMARY)
+  }
+  if (url.startsWith('/api/reports/categories')) {
+    return jsonResponse(200, REPORTS_CATEGORIES)
+  }
+  if (url.startsWith('/api/reports/trend')) {
+    return jsonResponse(200, REPORTS_TREND)
+  }
   if (url.startsWith('/api/categories')) {
     return jsonResponse(200, [])
   }
@@ -131,6 +166,15 @@ describe('route structure', () => {
     expect(screen.queryByRole('heading', { level: 1, name: 'Budgets' })).not.toBeInTheDocument()
   })
 
+  it('sends an unauthenticated visitor from /reports to the login page', async () => {
+    signedOut()
+
+    const router = renderAt('/reports')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+    expect(screen.queryByRole('heading', { level: 1, name: 'Reports' })).not.toBeInTheDocument()
+  })
+
   it('renders the overview page for a signed-in visitor', async () => {
     signedIn()
 
@@ -168,6 +212,17 @@ describe('route structure', () => {
     expect(
       await screen.findByText('No budgets yet. Add your first budget to get started.'),
     ).toBeInTheDocument()
+  })
+
+  it('renders the reports page for a signed-in visitor, inside the protected app shell', async () => {
+    signedIn()
+
+    renderAt('/reports')
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Reports' })).toBeInTheDocument()
+    expect(headerIsRendered()).toBe(false)
+    expect(footerIsRendered()).toBe(false)
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument()
   })
 
   it('renders the settings page for a signed-in visitor', async () => {
@@ -260,7 +315,7 @@ describe('route structure', () => {
     await screen.findByRole('heading', { level: 1, name: 'Categories' })
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
-    expect(within(nav).getAllByRole('link')).toHaveLength(5)
+    expect(within(nav).getAllByRole('link')).toHaveLength(6)
     expect(within(nav).queryAllByRole('button')).toHaveLength(0)
     expect(screen.queryByRole('button', { name: /Profile Data/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Income & Expenses/ })).not.toBeInTheDocument()

@@ -73,6 +73,16 @@ const NAV_ITEMS: NavItem[] = [
     )
   },
   {
+    to: '/reports',
+    label: 'Reports',
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M3 3v18h18" />
+        <path d="M7 15l4-5 3 3 5-7" />
+      </svg>
+    )
+  },
+  {
     to: '/settings',
     label: 'Settings',
     icon: (

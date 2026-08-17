@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard'
 import Transactions from './pages/Transactions'
 import Categories from './pages/Categories'
 import Budgets from './pages/Budgets'
+import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 
 export const routes: RouteObject[] = [
@@ -36,6 +37,7 @@ export const routes: RouteObject[] = [
               { path: 'transactions', element: <Transactions /> },
               { path: 'categories', element: <Categories /> },
               { path: 'budgets', element: <Budgets /> },
+              { path: 'reports', element: <Reports /> },
               { path: 'settings', element: <Settings /> }
             ]
           }
