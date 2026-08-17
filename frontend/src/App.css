@@ -1310,7 +1310,7 @@
 .category-form textarea {
   width: 100%;
   background: var(--bg);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--neutral-strong);
   color: var(--text);
   padding: 0.7rem 0.9rem;
   border-radius: var(--radius-sm);
@@ -1335,6 +1335,16 @@
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.form-input:focus-visible,
+.filter-select:focus-visible,
+.setting-select:focus-visible,
+.auth-form input:focus-visible,
+.category-form input:focus-visible,
+.category-form textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .form-input:disabled {
