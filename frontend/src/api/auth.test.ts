@@ -64,6 +64,77 @@ describe('auth endpoints', () => {
     expect(vi.mocked(globalThis.fetch).mock.calls[0][1]?.method).toBe('POST')
   })
 
+  it('retries logout once after a network error and resolves when the retry succeeds', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(globalThis.fetch)
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockResolvedValueOnce(emptyResponse(204))
+
+      const result = logout()
+      await vi.runAllTimersAsync()
+      await result
+
+      expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('rejects with the original network ApiError after both logout attempts fail, waiting between attempts', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'))
+
+      const caught = logout().catch((error: unknown) => error)
+      await vi.advanceTimersByTimeAsync(299)
+      expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(1)
+      const error = await caught
+
+      expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(2)
+      expect(error).toBeInstanceOf(ApiError)
+      expect((error as ApiError).status).toBe(0)
+      expect((error as ApiError).isNetworkError).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not retry logout when the first attempt fails with a non-network error', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse(401, { message: 'Session expired' }))
+
+    const error = await logout().catch((caught: unknown) => caught)
+
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1)
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).status).toBe(401)
+    expect((error as ApiError).isNetworkError).toBe(false)
+  })
+
+  it('does not retry login after a network failure', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const error = await login({ email: 'a@b.hu', password: 'x' }).catch((caught: unknown) => caught)
+
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1)
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).isNetworkError).toBe(true)
+  })
+
+  it('does not retry signup after a network failure', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const error = await signup({ username: 'alex', email: 'a@b.hu', password: 'secret12' }).catch(
+      (caught: unknown) => caught,
+    )
+
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1)
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).isNetworkError).toBe(true)
+  })
+
   it('reports a wrong current password as a 400 field error on currentPassword', async () => {
     const handler = vi.fn()
     setUnauthorizedHandler(handler)

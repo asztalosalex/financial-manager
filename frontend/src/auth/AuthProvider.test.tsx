@@ -25,7 +25,7 @@ function AuthProbe() {
     <>
       <span data-testid="status">{status}</span>
       <span data-testid="user">{user?.username ?? 'none'}</span>
-      <button type="button" onClick={() => void logout()}>
+      <button type="button" onClick={() => logout().catch(() => {})}>
         Log out
       </button>
       <button type="button" onClick={() => void api.get('/api/categories/user').catch(() => {})}>
@@ -120,6 +120,36 @@ describe('AuthProvider', () => {
       .mocked(globalThis.fetch)
       .mock.calls.find((call) => String(call[0]) === '/api/auth/logout')
     expect(logoutCall?.[1]?.method).toBe('POST')
+    expect(screen.getByTestId('status')).toHaveTextContent('anonymous')
+    expect(screen.getByTestId('user')).toHaveTextContent('none')
+    expect(screen.getByTestId('location')).toHaveTextContent('/')
+  })
+
+  it('clears the state and redirects home even when the logout request keeps failing', async () => {
+    vi.mocked(globalThis.fetch).mockImplementation((input) => {
+      if (String(input) === '/api/auth/logout') {
+        return Promise.reject(new TypeError('Failed to fetch'))
+      }
+      return Promise.resolve(jsonResponse(200, PROFILE))
+    })
+
+    renderProvider()
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'))
+
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
+      await act(async () => {
+        await vi.runAllTimersAsync()
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const logoutCalls = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.filter((call) => String(call[0]) === '/api/auth/logout')
+    expect(logoutCalls.length).toBe(2)
     expect(screen.getByTestId('status')).toHaveTextContent('anonymous')
     expect(screen.getByTestId('user')).toHaveTextContent('none')
     expect(screen.getByTestId('location')).toHaveTextContent('/')

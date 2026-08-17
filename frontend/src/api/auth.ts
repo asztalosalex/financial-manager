@@ -23,6 +23,24 @@ export function signup(payload: RegisterUserDto): Promise<UserResponseDto> {
   })
 }
 
-export function logout(): Promise<void> {
-  return api.post<void>('/api/auth/logout', undefined, { skipUnauthorizedHandler: true })
+const LOGOUT_MAX_ATTEMPTS = 2
+const LOGOUT_RETRY_DELAY_MS = 300
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+export async function logout(): Promise<void> {
+  for (let attempt = 1; attempt <= LOGOUT_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await api.post<void>('/api/auth/logout', undefined, { skipUnauthorizedHandler: true })
+      return
+    } catch (error) {
+      const isRetryable = error instanceof ApiError && error.isNetworkError
+      if (!isRetryable || attempt === LOGOUT_MAX_ATTEMPTS) {
+        throw error
+      }
+      await delay(LOGOUT_RETRY_DELAY_MS)
+    }
+  }
 }
