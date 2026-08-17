@@ -34,15 +34,18 @@ function ChangePasswordForm() {
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target
-    setForm((previous) => ({ ...previous, [name]: value }))
+    const nextForm = { ...form, [name]: value }
+    setForm(nextForm)
     setError('')
     setSuccess('')
     setFieldErrors((previous) => {
-      if (previous[name] === undefined) {
-        return previous
+      const revalidated = validate(nextForm)
+      const next: Record<string, string> = {}
+      for (const key of Object.keys(previous)) {
+        if (revalidated[key] !== undefined) {
+          next[key] = revalidated[key]
+        }
       }
-      const next = { ...previous }
-      delete next[name]
       return next
     })
   }

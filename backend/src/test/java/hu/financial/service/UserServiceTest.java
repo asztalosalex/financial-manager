@@ -20,6 +20,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import hu.financial.dto.user.UpdateProfileDto;
 
@@ -165,5 +166,16 @@ class UserServiceTest {
         assertEquals("currentPassword", exception.getField());
         verify(userRepository, never()).save(any(User.class));
         verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    void getCurrentUser_ReturnsPrincipalFromSecurityContext_WithoutQueryingRepository() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(testUser, null));
+
+        User result = userService.getCurrentUser();
+
+        assertSame(testUser, result);
+        verify(userRepository, never()).findByUsername(any());
     }
 }
