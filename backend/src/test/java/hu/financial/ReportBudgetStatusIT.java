@@ -127,8 +127,7 @@ class ReportBudgetStatusIT {
         strangerFood = categoryRepository.saveAndFlush(new Category(SHARED_CATEGORY_NAME, "stranger food", stranger));
 
         budget(owner, ownerHome, LocalDate.of(2026, 7, 1), "150000.00");
-        budget(owner, ownerFood, LocalDate.of(2026, 7, 1), "60000.00");
-        budget(owner, ownerFood, LocalDate.of(2026, 7, 20), "40000.00");
+        budget(owner, ownerFood, LocalDate.of(2026, 7, 20), "100000.00");
         budget(owner, ownerTravel, LocalDate.of(2026, 7, 15), "0.00");
         budget(owner, ownerSaving, LocalDate.of(2026, 7, 1), "30000.00");
         budget(owner, ownerClothes, LocalDate.of(2026, 7, 1), "10000.00");
@@ -196,7 +195,7 @@ class ReportBudgetStatusIT {
 
     @Test
     void bothUsersRowsAreReallyInTheTables_SoTheIsolationAssertionsBelowAreNotVacuous() {
-        assertEquals(9, budgetRepository.count());
+        assertEquals(8, budgetRepository.count());
         assertEquals(11, transactionRepository.count());
         assertEquals(SHARED_CATEGORY_NAME, ownerFood.getName());
         assertEquals(SHARED_CATEGORY_NAME, strangerFood.getName());
@@ -212,19 +211,6 @@ class ReportBudgetStatusIT {
         assertEquals(new BigDecimal("310000.00"), status.totalBudgeted());
         assertEquals(new BigDecimal("218000.00"), status.totalSpent());
         assertEquals(new BigDecimal("42000.00"), status.unbudgetedSpending());
-    }
-
-    @Test
-    void budgetStatus_TwoBudgetsOfTheSameCategoryAndMonth_AreAddedIntoASingleRow() {
-        BudgetStatusResponseDto status = statusFor(owner, REQUESTED_MONTH);
-
-        List<Long> foodRows = categoryIds(status).stream()
-                .filter(id -> ownerFood.getId().equals(id))
-                .toList();
-
-        assertEquals(1, foodRows.size());
-        assertEquals(new BigDecimal("100000.00"), rowOf(status, ownerFood).budgeted());
-        assertNotEquals(new BigDecimal("60000.00"), rowOf(status, ownerFood).budgeted());
     }
 
     @Test

@@ -445,6 +445,64 @@ class BudgetControllerMvcTest {
     }
 
     @Test
+    void createBudget_DuplicateForSameUserCategoryAndMonth_Returns409WithDuplicateResourceTitle() throws Exception {
+        Cookie csrf = csrfCookie();
+        Budget conflicting = new Budget(77L, new BigDecimal("300.00"), LocalDate.of(2026, 3, 1),
+                currentUser, null);
+        when(budgetRepository.findByUserAndCategoryAndMonth(any(), any(), any())).thenReturn(conflicting);
+
+        mockMvc.perform(post("/api/budgets")
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(new CreateBudgetDto(new BigDecimal("250.00"), LocalDate.of(2026, 3, 15),
+                        OWN_CATEGORY_ID))))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Duplicate Resource"))
+                .andExpect(jsonPath("$.message").exists());
+
+        verify(budgetRepository, never()).save(any(Budget.class));
+    }
+
+    @Test
+    void updateBudget_CategoryChangeCollidesWithAnotherBudget_Returns409WithDuplicateResourceTitle() throws Exception {
+        Cookie csrf = csrfCookie();
+        Budget conflicting = new Budget(78L, new BigDecimal("300.00"), ownBudget.getMonth(),
+                currentUser, null);
+        when(budgetRepository.findByUserAndCategoryAndMonth(any(), any(), any())).thenReturn(conflicting);
+
+        mockMvc.perform(put("/api/budgets/{id}", OWN_BUDGET_ID)
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(new CreateBudgetDto(new BigDecimal("250.00"), ownBudget.getMonth(),
+                        OTHER_OWN_CATEGORY_ID))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Duplicate Resource"));
+
+        verify(budgetRepository, never()).save(any(Budget.class));
+    }
+
+    @Test
+    void updateBudget_OnlyAmountChanges_SucceedsWithoutTriggeringTheDuplicateCheck() throws Exception {
+        Cookie csrf = csrfCookie();
+
+        mockMvc.perform(put("/api/budgets/{id}", OWN_BUDGET_ID)
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(new CreateBudgetDto(new BigDecimal("777.00"), ownBudget.getMonth(),
+                        OWN_CATEGORY_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.amount").value(777.00));
+
+        verify(budgetRepository, never()).findByUserAndCategoryAndMonth(any(), any(), any());
+    }
+
+    @Test
     void updateBudget_WithoutAuthCookie_Returns401() throws Exception {
         Cookie csrf = csrfCookie();
 

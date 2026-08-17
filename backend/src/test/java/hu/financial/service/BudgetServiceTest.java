@@ -20,6 +20,7 @@ import hu.financial.dto.budget.BudgetFilter;
 import hu.financial.dto.budget.CreateBudgetDto;
 import hu.financial.exception.budget.BudgetNotFoundException;
 import hu.financial.exception.budget.BudgetValidationException;
+import hu.financial.exception.budget.DuplicateBudgetException;
 import hu.financial.exception.category.CategoryNotFoundException;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -76,6 +77,27 @@ public class BudgetServiceTest {
 
         assertThrows(BudgetValidationException.class, () -> budgetService.createBudget(invalid));
         verify(budgetRepository, never()).save(any(Budget.class));
+    }
+
+    @Test
+    void createBudget_ShouldThrowDuplicate_WhenBudgetAlreadyExistsForUserCategoryAndMonth() {
+        when(budgetRepository.findByUserAndCategoryAndMonth(testUser, testCategory, testBudget.getMonth()))
+                .thenReturn(testBudget);
+
+        assertThrows(DuplicateBudgetException.class, () -> budgetService.createBudget(testBudget));
+        verify(budgetRepository, never()).save(any(Budget.class));
+    }
+
+    @Test
+    void createBudget_ShouldSucceed_WhenNoExistingBudgetForUserCategoryAndMonth() {
+        when(budgetRepository.findByUserAndCategoryAndMonth(testUser, testCategory, testBudget.getMonth()))
+                .thenReturn(null);
+        when(budgetRepository.save(any(Budget.class))).thenReturn(testBudget);
+
+        Budget result = budgetService.createBudget(testBudget);
+
+        assertEquals(testBudget, result);
+        verify(budgetRepository).save(testBudget);
     }
 
     @Test
@@ -160,6 +182,48 @@ public class BudgetServiceTest {
     }
 
     @Test
+    void updateBudget_ShouldThrowDuplicate_WhenCategoryChangesToCollideWithAnotherBudget() {
+        Category newCategory = new Category("newcategory", "newdescription", testUser);
+        newCategory.setId(2L);
+        Budget replacement = new Budget(null, new BigDecimal("250.00"), testBudget.getMonth(), testUser, newCategory);
+        Budget conflicting = new Budget(3L, new BigDecimal("999.00"), testBudget.getMonth(), testUser, newCategory);
+
+        when(budgetRepository.findById(testBudget.getId())).thenReturn(Optional.of(testBudget));
+        when(budgetRepository.findByUserAndCategoryAndMonth(testUser, newCategory, testBudget.getMonth()))
+                .thenReturn(conflicting);
+
+        assertThrows(DuplicateBudgetException.class, () -> budgetService.updateBudget(testBudget.getId(), replacement));
+        verify(budgetRepository, never()).save(any(Budget.class));
+    }
+
+    @Test
+    void updateBudget_ShouldThrowDuplicate_WhenMonthChangesToCollideWithAnotherBudget() {
+        LocalDate newMonth = testBudget.getMonth().plusMonths(1);
+        Budget replacement = new Budget(null, new BigDecimal("250.00"), newMonth, testUser, testCategory);
+        Budget conflicting = new Budget(3L, new BigDecimal("999.00"), newMonth, testUser, testCategory);
+
+        when(budgetRepository.findById(testBudget.getId())).thenReturn(Optional.of(testBudget));
+        when(budgetRepository.findByUserAndCategoryAndMonth(testUser, testCategory, newMonth))
+                .thenReturn(conflicting);
+
+        assertThrows(DuplicateBudgetException.class, () -> budgetService.updateBudget(testBudget.getId(), replacement));
+        verify(budgetRepository, never()).save(any(Budget.class));
+    }
+
+    @Test
+    void updateBudget_ShouldNotCheckForDuplicate_WhenOnlyAmountChanges() {
+        Budget replacement = new Budget(null, new BigDecimal("999.00"), testBudget.getMonth(), testUser, testCategory);
+
+        when(budgetRepository.findById(testBudget.getId())).thenReturn(Optional.of(testBudget));
+        when(budgetRepository.save(any(Budget.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Budget result = budgetService.updateBudget(testBudget.getId(), replacement);
+
+        assertEquals(new BigDecimal("999.00"), result.getAmount());
+        verify(budgetRepository, never()).findByUserAndCategoryAndMonth(any(), any(), any());
+    }
+
+    @Test
     void updateBudget_ShouldThrowNotFound_WhenMissing() {
         when(budgetRepository.findById(99L)).thenReturn(Optional.empty());
 
@@ -218,5 +282,41 @@ public class BudgetServiceTest {
 
         assertEquals(new BigDecimal("100.00"), result.getAmount());
         assertEquals(2, result.getAmount().scale());
+    }
+
+    @Test
+    void mapToEntity_ShouldNormalizeMonthToTheFirstDayOfMonth_WhenDtoProvidesALaterDay() {
+        LocalDate midMonth = LocalDate.of(2026, 3, 15);
+        CreateBudgetDto dto = new CreateBudgetDto(new BigDecimal("100.00"), midMonth, testCategory.getId());
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId())).thenReturn(testCategory);
+
+        Budget result = budgetService.mapToEntity(dto);
+
+        assertEquals(LocalDate.of(2026, 3, 1), result.getMonth());
+    }
+
+    @Test
+    void mapToEntity_ShouldNormalizeMonthToTheFirstDayOfMonth_WhenDtoProvidesTheLastDayOfMonth() {
+        LocalDate lastDay = LocalDate.of(2026, 4, 30);
+        CreateBudgetDto dto = new CreateBudgetDto(new BigDecimal("100.00"), lastDay, testCategory.getId());
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId())).thenReturn(testCategory);
+
+        Budget result = budgetService.mapToEntity(dto);
+
+        assertEquals(LocalDate.of(2026, 4, 1), result.getMonth());
+    }
+
+    @Test
+    void mapToEntity_ShouldLeaveMonthUnchanged_WhenDtoAlreadyProvidesTheFirstDayOfMonth() {
+        LocalDate firstDay = LocalDate.of(2026, 5, 1);
+        CreateBudgetDto dto = new CreateBudgetDto(new BigDecimal("100.00"), firstDay, testCategory.getId());
+        when(userService.getCurrentUser()).thenReturn(testUser);
+        when(categoryService.getOwnedCategoryById(testCategory.getId(), testUser.getId())).thenReturn(testCategory);
+
+        Budget result = budgetService.mapToEntity(dto);
+
+        assertEquals(LocalDate.of(2026, 5, 1), result.getMonth());
     }
 }

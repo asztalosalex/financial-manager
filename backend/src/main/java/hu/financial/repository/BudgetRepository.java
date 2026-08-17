@@ -10,10 +10,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import hu.financial.model.Budget;
+import hu.financial.model.Category;
+import hu.financial.model.User;
 import hu.financial.repository.projection.CategoryBudgetTotal;
 
 @Repository
 public interface BudgetRepository extends JpaRepository<Budget, Long>, JpaSpecificationExecutor<Budget> {
+
+    Budget findByUserAndCategoryAndMonth(User user, Category category, LocalDate month);
 
     @Query("""
             SELECT new hu.financial.repository.projection.CategoryBudgetTotal(

@@ -11,6 +11,7 @@ import hu.financial.model.Budget;
 import hu.financial.model.User;
 import hu.financial.exception.budget.BudgetNotFoundException;
 import hu.financial.exception.budget.BudgetValidationException;
+import hu.financial.exception.budget.DuplicateBudgetException;
 import hu.financial.dto.budget.BudgetFilter;
 import hu.financial.dto.budget.CreateBudgetDto;
 import hu.financial.dto.budget.BudgetResponseDto;
@@ -55,6 +56,7 @@ public class BudgetService {
         Budget existingBudget = budgetRepository.findById(id)
                 .orElseThrow(() -> new BudgetNotFoundException(id));
         validateAmount(budget.getAmount());
+        validateBudgetForUpdate(existingBudget, budget);
         existingBudget.setAmount(budget.getAmount());
         existingBudget.setMonth(budget.getMonth());
         existingBudget.setCategory(budget.getCategory());
@@ -70,6 +72,19 @@ public class BudgetService {
 
     private void validateBudgetForCreation(Budget budget) {
         validateAmount(budget.getAmount());
+        if (budgetRepository.findByUserAndCategoryAndMonth(budget.getUser(), budget.getCategory(), budget.getMonth()) != null) {
+            throw new DuplicateBudgetException(budget.getCategory().getId(), budget.getMonth());
+        }
+    }
+
+    private void validateBudgetForUpdate(Budget existingBudget, Budget budget) {
+        boolean categoryChanged = !existingBudget.getCategory().getId().equals(budget.getCategory().getId());
+        boolean monthChanged = !existingBudget.getMonth().equals(budget.getMonth());
+        if (categoryChanged || monthChanged) {
+            if (budgetRepository.findByUserAndCategoryAndMonth(budget.getUser(), budget.getCategory(), budget.getMonth()) != null) {
+                throw new DuplicateBudgetException(budget.getCategory().getId(), budget.getMonth());
+            }
+        }
     }
 
     private void validateAmount(BigDecimal amount) {
@@ -82,7 +97,7 @@ public class BudgetService {
         User currentUser = userService.getCurrentUser();
         Budget budget = new Budget();
         budget.setAmount(dto.amount().setScale(2, RoundingMode.HALF_UP));
-        budget.setMonth(dto.month());
+        budget.setMonth(dto.month().withDayOfMonth(1));
         budget.setCategory(categoryService.getOwnedCategoryById(dto.categoryId(), currentUser.getId()));
         budget.setUser(currentUser);
         return budget;

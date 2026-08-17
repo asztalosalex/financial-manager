@@ -21,6 +21,7 @@ import hu.financial.exception.category.CategoryValidationException;
 import hu.financial.exception.category.DuplicateCategoryException;
 import hu.financial.exception.budget.BudgetNotFoundException;
 import hu.financial.exception.budget.BudgetValidationException;
+import hu.financial.exception.budget.DuplicateBudgetException;
 import hu.financial.exception.transaction.TransactionNotFoundException;
 import hu.financial.exception.transaction.TransactionValidationException;
 import jakarta.validation.ConstraintViolation;
@@ -221,9 +222,9 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(DuplicateCategoryException.class)
+    @ExceptionHandler({DuplicateCategoryException.class, DuplicateBudgetException.class})
     public ResponseEntity<ErrorResponse> handleDuplicateResource(
-            DuplicateCategoryException ex, WebRequest request) {
+            RuntimeException ex, WebRequest request) {
         ErrorResponse errorResponse = new ErrorResponse(
                 HttpStatus.CONFLICT.value(),
                 "Duplicate Resource",

@@ -82,7 +82,7 @@ class FlywayPostgresIT {
                 "select version from flyway_schema_history where success = true order by installed_rank",
                 String.class);
 
-        assertEquals(List.of("1", "2"), applied);
+        assertEquals(List.of("1", "2", "3"), applied);
     }
 
     @Test
