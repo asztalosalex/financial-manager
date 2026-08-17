@@ -19,7 +19,6 @@ financial-manager/
 │   │   ├── security/              # JWT + CSRF cookie handling (CsrfCookieFilter lives here)
 │   │   ├── filter/                 # Servlet filters outside the security chain (JwtAuthenticationFilter)
 │   │   ├── config/                  # SecurityConfig, FilterRegistrationConfig, SwaggerConfig
-│   │   ├── responses/               # Cross-cutting response shapes (e.g. LoginResponse)
 │   │   ├── web/                      # Request-layer helpers (e.g. SortWhitelist)
 │   │   └── exception/              # Domain exceptions + global handler
 │   ├── src/main/resources/db/migration/  # Flyway SQL migrations
@@ -28,7 +27,7 @@ financial-manager/
 ├── frontend/                    # React + TypeScript SPA
 │   ├── src/
 │   │   ├── pages/                 # Route-level views (Dashboard, Transactions, Categories, Settings, Login, Register, Home)
-│   │   ├── components/            # Reusable UI + layout components (incl. components/layout, components/dashboard)
+│   │   ├── components/            # Reusable UI + layout components (incl. components/layout, components/dashboard, components/budgets, components/transactions)
 │   │   ├── api/                    # Typed fetch client per domain
 │   │   ├── auth/                    # Auth context/provider, route guarding
 │   │   ├── lib/                      # Pure presentation-adjacent helpers (formatting, chart math)
