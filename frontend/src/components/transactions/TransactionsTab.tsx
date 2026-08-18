@@ -7,8 +7,9 @@ import Pagination from '../Pagination'
 import TransactionFilters, { type TransactionFiltersValue } from './TransactionFilters'
 import TransactionRow, { type TransactionRowItem } from './TransactionRow'
 import TransactionForm, { type TransactionFormValues } from './TransactionForm'
-import { formatCurrencyHuf, formatTransactionListDate } from '../../lib/format'
+import { formatBudgetMonthLabel, formatCurrencyHuf, formatTransactionListDate } from '../../lib/format'
 import type {
+  BudgetStatusItem,
   CategoryResponseDto,
   CreateTransactionDto,
   PageResponse,
@@ -27,6 +28,15 @@ function defaultFormValues(): TransactionFormValues {
 
 function hasActiveFilters(value: TransactionFiltersValue): boolean {
   return value.type !== '' || value.categoryId !== '' || value.from !== '' || value.to !== ''
+}
+
+function buildBudgetWarningMessage(warning: BudgetStatusItem | null, transactionDate: string): string {
+  if (warning === null) {
+    return ''
+  }
+  const monthLabel = formatBudgetMonthLabel(transactionDate.slice(0, 7))
+  const overLabel = formatCurrencyHuf(Math.abs(warning.remaining))
+  return `Heads up: this pushed ${warning.categoryName} over its ${monthLabel} budget by ${overLabel} (${formatCurrencyHuf(warning.spent)} spent of ${formatCurrencyHuf(warning.budgeted)}).`
 }
 
 function buildTransactionRowItems(page: PageResponse<TransactionResponseDto>): TransactionRowItem[] {
@@ -66,6 +76,7 @@ function TransactionsTab() {
   const [formError, setFormError] = useState('')
   const [formFieldErrors, setFormFieldErrors] = useState<Record<string, string>>({})
   const [formSuccess, setFormSuccess] = useState('')
+  const [formWarning, setFormWarning] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const reload = useCallback(
@@ -128,6 +139,7 @@ function TransactionsTab() {
       setFormValues(defaultFormValues())
       setFormError('')
       setFormFieldErrors({})
+      setFormWarning('')
       setShowForm(true)
       setSearchParams(
         (prev) => {
@@ -155,6 +167,7 @@ function TransactionsTab() {
     setFormValues(defaultFormValues())
     setFormError('')
     setFormFieldErrors({})
+    setFormWarning('')
     setShowForm(true)
   }
 
@@ -169,6 +182,7 @@ function TransactionsTab() {
     })
     setFormError('')
     setFormFieldErrors({})
+    setFormWarning('')
     setShowForm(true)
   }
 
@@ -185,6 +199,7 @@ function TransactionsTab() {
     setFormError('')
     setFormFieldErrors({})
     setFormSuccess('')
+    setFormWarning('')
 
     const { type, categoryId, amount, date, description } = formValues
 
@@ -216,9 +231,10 @@ function TransactionsTab() {
         setFormSuccess('Transaction updated successfully')
         await reload()
       } else {
-        await createTransaction(payload)
+        const created = await createTransaction(payload)
         setShowForm(false)
         setFormSuccess('Transaction created successfully')
+        setFormWarning(buildBudgetWarningMessage(created.budgetWarning, payload.date))
         if (page === 0) {
           await reload()
         } else {
@@ -276,6 +292,12 @@ function TransactionsTab() {
       {formSuccess && (
         <div className="auth-success" role="status">
           {formSuccess}
+        </div>
+      )}
+
+      {formWarning && (
+        <div className="budget-warning-banner" role="status">
+          {formWarning}
         </div>
       )}
 

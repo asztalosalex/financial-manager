@@ -1409,6 +1409,16 @@
   font-size: 0.9rem;
 }
 
+.budget-warning-banner {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
 /* ==================================== */
 /* Auth pages                           */
 /* ==================================== */

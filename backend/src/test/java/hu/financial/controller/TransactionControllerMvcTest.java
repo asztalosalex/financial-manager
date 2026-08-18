@@ -8,14 +8,18 @@ import hu.financial.model.Category;
 import hu.financial.model.Transaction;
 import hu.financial.model.User;
 import hu.financial.model.enums.TransactionType;
+import hu.financial.repository.BudgetRepository;
 import hu.financial.repository.CategoryRepository;
 import hu.financial.repository.TransactionRepository;
+import hu.financial.repository.projection.CategoryBudgetTotal;
+import hu.financial.repository.projection.CategoryExpenseTotal;
 import hu.financial.security.CookieProperties;
 import hu.financial.security.CsrfCookieFilter;
 import hu.financial.security.RestAccessDeniedHandler;
 import hu.financial.security.SecurityCookieFactory;
 import hu.financial.service.CategoryService;
 import hu.financial.service.JwtService;
+import hu.financial.service.ReportService;
 import hu.financial.service.TransactionService;
 import hu.financial.service.UserService;
 import jakarta.servlet.http.Cookie;
@@ -42,12 +46,16 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.InOrder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -58,7 +66,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(TransactionController.class)
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class, CookieProperties.class, RestAccessDeniedHandler.class,
         SecurityCookieFactory.class, CsrfCookieFilter.class, JwtService.class, TransactionService.class,
-        CategoryService.class })
+        CategoryService.class, ReportService.class })
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
         "security.jwt.expiration-time=3600",
@@ -91,6 +99,9 @@ class TransactionControllerMvcTest {
 
     @MockBean
     private CategoryRepository categoryRepository;
+
+    @MockBean
+    private BudgetRepository budgetRepository;
 
     private User currentUser;
 
@@ -128,6 +139,25 @@ class TransactionControllerMvcTest {
         when(transactionRepository.findAll(anySpecification(), any(Pageable.class)))
                 .thenAnswer(invocation -> new PageImpl<Transaction>(List.of(), invocation.getArgument(1), 0));
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(budgetRepository.summarizeBudgetsByCategory(any(), any(), any())).thenReturn(List.of());
+        when(transactionRepository.summarizeExpensesByCategory(any(), any(), any(), any())).thenReturn(List.of());
+    }
+
+    private CreateTransactionDto expensePayload(BigDecimal amount, LocalDate date, Long categoryId) {
+        return new CreateTransactionDto(TransactionType.EXPENSE, "grocery run", categoryId, amount, date);
+    }
+
+    private CreateTransactionDto incomePayload(BigDecimal amount, LocalDate date, Long categoryId) {
+        return new CreateTransactionDto(TransactionType.INCOME, "paycheck", categoryId, amount, date);
+    }
+
+    private void givenBudgetAndSpent(LocalDate start, LocalDate end, Long categoryId, String categoryName,
+            String budgeted, String spent) {
+        when(budgetRepository.summarizeBudgetsByCategory(eq(currentUser.getId()), eq(start), eq(end)))
+                .thenReturn(List.of(new CategoryBudgetTotal(categoryId, categoryName, new BigDecimal(budgeted))));
+        when(transactionRepository.summarizeExpensesByCategory(eq(currentUser.getId()), eq(start), eq(end),
+                eq(TransactionType.EXPENSE)))
+                .thenReturn(List.of(new CategoryExpenseTotal(categoryId, categoryName, new BigDecimal(spent))));
     }
 
     private Cookie authCookie() {
@@ -184,6 +214,191 @@ class TransactionControllerMvcTest {
                 .andExpect(jsonPath("$.status").value(404));
 
         verify(transactionRepository, never()).save(any(Transaction.class));
+    }
+
+    @Test
+    void createTransaction_ReturnsABudgetWarning_WhenTheNewExpensePushesTheCategoryOverBudget() throws Exception {
+        Cookie csrf = csrfCookie();
+        givenBudgetAndSpent(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), OWN_CATEGORY_ID, "groceries",
+                "150000.00", "162000.00");
+
+        mockMvc.perform(post("/api/transactions")
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(expensePayload(new BigDecimal("250.00"), LocalDate.of(2026, 7, 15), OWN_CATEGORY_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.budgetWarning").exists())
+                .andExpect(jsonPath("$.budgetWarning.categoryId").value(OWN_CATEGORY_ID))
+                .andExpect(jsonPath("$.budgetWarning.categoryName").value("groceries"))
+                .andExpect(jsonPath("$.budgetWarning.budgeted").value(150000.00))
+                .andExpect(jsonPath("$.budgetWarning.spent").value(162000.00))
+                .andExpect(jsonPath("$.budgetWarning.remaining").value(-12000.00))
+                .andExpect(jsonPath("$.budgetWarning.percentageUsed").value(108.0));
+    }
+
+    @Test
+    void createTransaction_BudgetWarningFieldsAreJsonNumbers_NotStrings() throws Exception {
+        Cookie csrf = csrfCookie();
+        givenBudgetAndSpent(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), OWN_CATEGORY_ID, "groceries",
+                "150000.00", "162000.00");
+
+        mockMvc.perform(post("/api/transactions")
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(expensePayload(new BigDecimal("250.00"), LocalDate.of(2026, 7, 15), OWN_CATEGORY_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.budgetWarning.budgeted").isNumber())
+                .andExpect(jsonPath("$.budgetWarning.spent").isNumber())
+                .andExpect(jsonPath("$.budgetWarning.remaining").isNumber())
+                .andExpect(jsonPath("$.budgetWarning.percentageUsed").isNumber());
+    }
+
+    @Test
+    void createTransaction_BudgetWarningIsNull_WhenTheExpenseStaysWithinBudget() throws Exception {
+        Cookie csrf = csrfCookie();
+        givenBudgetAndSpent(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), OWN_CATEGORY_ID, "groceries",
+                "150000.00", "36000.00");
+
+        mockMvc.perform(post("/api/transactions")
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(expensePayload(new BigDecimal("250.00"), LocalDate.of(2026, 7, 15), OWN_CATEGORY_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.budgetWarning").value(nullValue()));
+    }
+
+    @Test
+    void createTransaction_BudgetWarningIsNull_WhenSpendingExactlyMatchesTheBudget_BecauseTheThresholdIsRemainingBelowZero()
+            throws Exception {
+        Cookie csrf = csrfCookie();
+        givenBudgetAndSpent(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), OWN_CATEGORY_ID, "groceries",
+                "150000.00", "150000.00");
+
+        mockMvc.perform(post("/api/transactions")
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(expensePayload(new BigDecimal("250.00"), LocalDate.of(2026, 7, 15), OWN_CATEGORY_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.budgetWarning").value(nullValue()));
+    }
+
+    @Test
+    void createTransaction_BudgetWarningIsPresent_WhenSpendingIsOneCentOverTheBudget() throws Exception {
+        Cookie csrf = csrfCookie();
+        givenBudgetAndSpent(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), OWN_CATEGORY_ID, "groceries",
+                "150000.00", "150000.01");
+
+        mockMvc.perform(post("/api/transactions")
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(expensePayload(new BigDecimal("0.01"), LocalDate.of(2026, 7, 15), OWN_CATEGORY_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.budgetWarning.remaining").value(-0.01));
+    }
+
+    @Test
+    void createTransaction_BudgetWarningIsNull_WhenTheCategoryHasNoBudgetForTheMonth() throws Exception {
+        Cookie csrf = csrfCookie();
+
+        mockMvc.perform(post("/api/transactions")
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(expensePayload(new BigDecimal("250.00"), LocalDate.of(2026, 7, 15), OWN_CATEGORY_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.budgetWarning").value(nullValue()));
+    }
+
+    @Test
+    void createTransaction_BudgetWarningIsNull_ForIncome_EvenWhenTheCategoryBudgetIsOverspent() throws Exception {
+        Cookie csrf = csrfCookie();
+        givenBudgetAndSpent(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), OTHER_OWN_CATEGORY_ID, "salary",
+                "150000.00", "162000.00");
+
+        mockMvc.perform(post("/api/transactions")
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(incomePayload(new BigDecimal("250.00"), LocalDate.of(2026, 7, 15), OTHER_OWN_CATEGORY_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.budgetWarning").value(nullValue()));
+
+        verify(budgetRepository, never()).summarizeBudgetsByCategory(any(), any(), any());
+    }
+
+    @Test
+    void createTransaction_UsesTheTransactionsOwnDateMonth_NotTheServerClocksCurrentMonth() throws Exception {
+        Cookie csrf = csrfCookie();
+        LocalDate longAgoStart = LocalDate.of(2019, 3, 1);
+        LocalDate longAgoEnd = LocalDate.of(2019, 3, 31);
+        givenBudgetAndSpent(longAgoStart, longAgoEnd, OWN_CATEGORY_ID, "groceries", "150000.00", "162000.00");
+
+        mockMvc.perform(post("/api/transactions")
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(expensePayload(new BigDecimal("250.00"), LocalDate.of(2019, 3, 10), OWN_CATEGORY_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.budgetWarning.remaining").value(-12000.00));
+
+        verify(budgetRepository).summarizeBudgetsByCategory(eq(currentUser.getId()), eq(longAgoStart), eq(longAgoEnd));
+    }
+
+    @Test
+    void createTransaction_ReadsTheSpentTotalAfterSavingTheNewTransaction_NotBeforeIt() throws Exception {
+        Cookie csrf = csrfCookie();
+        givenBudgetAndSpent(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), OWN_CATEGORY_ID, "groceries",
+                "150000.00", "162000.00");
+
+        mockMvc.perform(post("/api/transactions")
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(expensePayload(new BigDecimal("250.00"), LocalDate.of(2026, 7, 15), OWN_CATEGORY_ID))))
+                .andExpect(status().isCreated());
+
+        InOrder order = inOrder(transactionRepository);
+        order.verify(transactionRepository).save(any(Transaction.class));
+        order.verify(transactionRepository).summarizeExpensesByCategory(eq(currentUser.getId()),
+                eq(LocalDate.of(2026, 7, 1)), eq(LocalDate.of(2026, 7, 31)), eq(TransactionType.EXPENSE));
+    }
+
+    @Test
+    void updateTransaction_ResponseBudgetWarning_IsAlwaysNull_EvenWhenTheEditedCategoryIsOverBudget() throws Exception {
+        Cookie csrf = csrfCookie();
+        givenBudgetAndSpent(LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 28), OWN_CATEGORY_ID, "groceries",
+                "100.00", "9999.00");
+
+        mockMvc.perform(put("/api/transactions/{id}", OWN_TRANSACTION_ID)
+                .cookie(authCookie(), csrf)
+                .header("X-XSRF-TOKEN", csrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(new CreateTransactionDto(TransactionType.EXPENSE, "overspent edit", OWN_CATEGORY_ID,
+                        new BigDecimal("50.00"), LocalDate.of(2026, 2, 10)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.budgetWarning").value(nullValue()));
+    }
+
+    @Test
+    void getTransactionById_ResponseBudgetWarning_IsAlwaysNull() throws Exception {
+        mockMvc.perform(get("/api/transactions/{id}", OWN_TRANSACTION_ID).cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.budgetWarning").value(nullValue()));
+    }
+
+    @Test
+    void getMyTransactions_ResponseBudgetWarning_IsAlwaysNullOnEveryRow() throws Exception {
+        when(transactionRepository.findAll(anySpecification(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(ownTransaction), invocation.getArgument(1), 1));
+
+        mockMvc.perform(get("/api/transactions").cookie(authCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].budgetWarning").value(nullValue()));
     }
 
     @Test

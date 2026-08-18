@@ -71,14 +71,14 @@ public class TransactionControllerTest {
                 testCategory.getId(), new BigDecimal("100.00"), LocalDate.now());
 
         transactionResponseDto = new TransactionResponseDto(testTransaction.getId(), TransactionType.INCOME,
-                "testdescription", testCategory.getId(), testCategory.getName(), new BigDecimal("100.00"), testTransaction.getDate());
+                "testdescription", testCategory.getId(), testCategory.getName(), new BigDecimal("100.00"), testTransaction.getDate(), null);
     }
 
     @Test
     void createTransaction_ShouldReturnCreated_WhenValidTransaction() {
         when(transactionService.mapToEntity(any(CreateTransactionDto.class))).thenReturn(testTransaction);
         when(transactionService.createTransaction(any(Transaction.class))).thenReturn(testTransaction);
-        when(transactionService.mapToDto(any(Transaction.class))).thenReturn(transactionResponseDto);
+        when(transactionService.mapToDtoWithBudgetWarning(any(Transaction.class))).thenReturn(transactionResponseDto);
 
         ResponseEntity<TransactionResponseDto> response = transactionController.createTransaction(createTransactionDto);
 
@@ -87,6 +87,19 @@ public class TransactionControllerTest {
         assertNotNull(response.getBody());
         assertEquals(testTransaction.getId(), response.getBody().id());
         verify(transactionService).createTransaction(any(Transaction.class));
+        verify(transactionService).mapToDtoWithBudgetWarning(testTransaction);
+        verify(transactionService, never()).mapToDto(any(Transaction.class));
+    }
+
+    @Test
+    void createTransaction_ShouldNeverCallPlainMapToDto_BecauseCreateAlwaysNeedsTheBudgetWarningOverload() {
+        when(transactionService.mapToEntity(any(CreateTransactionDto.class))).thenReturn(testTransaction);
+        when(transactionService.createTransaction(any(Transaction.class))).thenReturn(testTransaction);
+        when(transactionService.mapToDtoWithBudgetWarning(any(Transaction.class))).thenReturn(transactionResponseDto);
+
+        transactionController.createTransaction(createTransactionDto);
+
+        verify(transactionService, never()).mapToDto(any(Transaction.class));
     }
 
     @Test
@@ -114,6 +127,7 @@ public class TransactionControllerTest {
         verify(transactionService).getTransactionsByUserId(eq(testUser.getId()), eq(TransactionFilter.unfiltered()),
                 pageable.capture());
         assertEquals(Sort.by(Sort.Order.desc("date"), Sort.Order.desc("id")), pageable.getValue().getSort());
+        verify(transactionService, never()).mapToDtoWithBudgetWarning(any(Transaction.class));
     }
 
     @Test
@@ -160,6 +174,7 @@ public class TransactionControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(testTransaction.getId(), response.getBody().id());
+        verify(transactionService, never()).mapToDtoWithBudgetWarning(any(Transaction.class));
     }
 
     @Test
@@ -199,6 +214,8 @@ public class TransactionControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         verify(transactionService).updateTransaction(eq(testTransaction.getId()), any(Transaction.class));
+        verify(transactionService).mapToDto(testTransaction);
+        verify(transactionService, never()).mapToDtoWithBudgetWarning(any(Transaction.class));
     }
 
     @Test

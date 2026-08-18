@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -876,5 +877,105 @@ class ReportServiceTest {
 
         verify(budgetRepository).summarizeBudgetsByCategory(eq(42L), any(), any());
         verify(transactionRepository).summarizeExpensesByCategory(eq(42L), any(), any(), any());
+    }
+
+    @Test
+    void categoryBudgetStatus_ReturnsEmpty_WhenTheCategoryHasNoBudgetForTheMonth() {
+        when(budgetRepository.summarizeBudgetsByCategory(eq(USER_ID), eq(LocalDate.of(2026, 7, 1)),
+                eq(LocalDate.of(2026, 7, 31)))).thenReturn(List.of());
+
+        Optional<BudgetStatusItemDto> result = reportService.categoryBudgetStatus(USER_ID, 4L, YearMonth.of(2026, 7));
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void categoryBudgetStatus_DoesNotThrow_AndDoesNotEvenQueryExpenses_WhenTheCategoryHasNoBudgetForTheMonth() {
+        when(budgetRepository.summarizeBudgetsByCategory(eq(USER_ID), eq(LocalDate.of(2026, 7, 1)),
+                eq(LocalDate.of(2026, 7, 31)))).thenReturn(List.of());
+
+        reportService.categoryBudgetStatus(USER_ID, 4L, YearMonth.of(2026, 7));
+
+        verify(transactionRepository, org.mockito.Mockito.never())
+                .summarizeExpensesByCategory(any(), any(), any(), any());
+    }
+
+    @Test
+    void categoryBudgetStatus_MatchesTheSameNumbersTheBudgetStatusReportWouldComputeForThatCategory() {
+        when(budgetRepository.summarizeBudgetsByCategory(eq(USER_ID), eq(LocalDate.of(2026, 7, 1)),
+                eq(LocalDate.of(2026, 7, 31)))).thenReturn(List.of(
+                        budgetRow(4L, "Lakhatás", "150000"),
+                        budgetRow(1L, "Élelmiszer", "100000")));
+        when(transactionRepository.summarizeExpensesByCategory(eq(USER_ID), eq(LocalDate.of(2026, 7, 1)),
+                eq(LocalDate.of(2026, 7, 31)), eq(TransactionType.EXPENSE))).thenReturn(List.of(
+                        categoryRow(4L, "Lakhatás", "162000"),
+                        categoryRow(1L, "Élelmiszer", "36000")));
+
+        BudgetStatusItemDto viaSingleCategory = reportService.categoryBudgetStatus(USER_ID, 4L, YearMonth.of(2026, 7)).orElseThrow();
+        BudgetStatusItemDto viaFullReport = rowOf(reportService.budgetStatus(USER_ID, JULY), 4L);
+
+        assertEquals(viaFullReport.budgeted(), viaSingleCategory.budgeted());
+        assertEquals(viaFullReport.spent(), viaSingleCategory.spent());
+        assertEquals(viaFullReport.remaining(), viaSingleCategory.remaining());
+        assertEquals(viaFullReport.percentageUsed(), viaSingleCategory.percentageUsed());
+        assertEquals(new BigDecimal("-12000.00"), viaSingleCategory.remaining());
+        assertEquals(new BigDecimal("108.0"), viaSingleCategory.percentageUsed());
+    }
+
+    private static BudgetStatusItemDto rowOf(BudgetStatusResponseDto status, long categoryId) {
+        return status.categories().stream()
+                .filter(item -> item.categoryId() == categoryId)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    @Test
+    void categoryBudgetStatus_TreatsNoSpendingAsZero_RatherThanThrowing() {
+        when(budgetRepository.summarizeBudgetsByCategory(eq(USER_ID), eq(LocalDate.of(2026, 7, 1)),
+                eq(LocalDate.of(2026, 7, 31)))).thenReturn(List.of(budgetRow(4L, "Lakhatás", "150000")));
+        when(transactionRepository.summarizeExpensesByCategory(eq(USER_ID), eq(LocalDate.of(2026, 7, 1)),
+                eq(LocalDate.of(2026, 7, 31)), eq(TransactionType.EXPENSE))).thenReturn(List.of());
+
+        BudgetStatusItemDto result = reportService.categoryBudgetStatus(USER_ID, 4L, YearMonth.of(2026, 7)).orElseThrow();
+
+        assertEquals(new BigDecimal("0.00"), result.spent());
+        assertEquals(new BigDecimal("150000.00"), result.remaining());
+    }
+
+    @Test
+    void categoryBudgetStatus_OnlyPicksTheRequestedCategory_EvenWhenOtherCategoriesAreInTheSameQueryResult() {
+        when(budgetRepository.summarizeBudgetsByCategory(eq(USER_ID), eq(LocalDate.of(2026, 7, 1)),
+                eq(LocalDate.of(2026, 7, 31)))).thenReturn(List.of(
+                        budgetRow(4L, "Lakhatás", "150000"),
+                        budgetRow(1L, "Élelmiszer", "100000")));
+        when(transactionRepository.summarizeExpensesByCategory(eq(USER_ID), eq(LocalDate.of(2026, 7, 1)),
+                eq(LocalDate.of(2026, 7, 31)), eq(TransactionType.EXPENSE))).thenReturn(List.of(
+                        categoryRow(4L, "Lakhatás", "162000"),
+                        categoryRow(1L, "Élelmiszer", "36000")));
+
+        BudgetStatusItemDto result = reportService.categoryBudgetStatus(USER_ID, 1L, YearMonth.of(2026, 7)).orElseThrow();
+
+        assertEquals(1L, result.categoryId());
+        assertEquals(new BigDecimal("100000.00"), result.budgeted());
+        assertEquals(new BigDecimal("36000.00"), result.spent());
+    }
+
+    @Test
+    void categoryBudgetStatus_UsesExactlyTheGivenMonthsBoundaries_NotTheServerClocksCurrentMonth() {
+        YearMonth farInThePast = YearMonth.of(2019, 3);
+        when(budgetRepository.summarizeBudgetsByCategory(eq(USER_ID), eq(LocalDate.of(2019, 3, 1)),
+                eq(LocalDate.of(2019, 3, 31)))).thenReturn(List.of(budgetRow(4L, "Lakhatás", "150000")));
+        when(transactionRepository.summarizeExpensesByCategory(eq(USER_ID), eq(LocalDate.of(2019, 3, 1)),
+                eq(LocalDate.of(2019, 3, 31)), eq(TransactionType.EXPENSE))).thenReturn(List.of(
+                        categoryRow(4L, "Lakhatás", "162000")));
+
+        Optional<BudgetStatusItemDto> result = reportService.categoryBudgetStatus(USER_ID, 4L, farInThePast);
+
+        assertTrue(result.isPresent());
+        assertEquals(new BigDecimal("-12000.00"), result.get().remaining());
+        verify(budgetRepository).summarizeBudgetsByCategory(eq(USER_ID), eq(LocalDate.of(2019, 3, 1)),
+                eq(LocalDate.of(2019, 3, 31)));
+        verify(transactionRepository).summarizeExpensesByCategory(eq(USER_ID), eq(LocalDate.of(2019, 3, 1)),
+                eq(LocalDate.of(2019, 3, 31)), eq(TransactionType.EXPENSE));
     }
 }

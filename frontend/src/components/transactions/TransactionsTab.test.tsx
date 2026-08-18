@@ -81,6 +81,7 @@ const SAMPLE_TRANSACTIONS: TransactionResponseDto[] = [
     categoryName: 'Salary',
     amount: 500000,
     date: '2026-08-01',
+    budgetWarning: null,
   },
   {
     id: 102,
@@ -90,6 +91,7 @@ const SAMPLE_TRANSACTIONS: TransactionResponseDto[] = [
     categoryName: 'Groceries',
     amount: 12500,
     date: '2026-08-14',
+    budgetWarning: null,
   },
 ]
 
@@ -482,6 +484,7 @@ describe('TransactionsTab', () => {
               categoryName: 'Groceries',
               amount: 250.5,
               date: '2026-08-15',
+              budgetWarning: null,
             })
           : jsonResponse(
               200,
@@ -528,6 +531,7 @@ describe('TransactionsTab', () => {
               categoryName: 'Salary',
               amount: 1000,
               date: new Date().toISOString().slice(0, 10),
+              budgetWarning: null,
             })
           : jsonResponse(200, emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 3, totalPages: 1 })),
     })
@@ -540,6 +544,209 @@ describe('TransactionsTab', () => {
     expect(transactionCalls().length).toBeGreaterThan(callsBefore)
     expect(screen.getByText('Transaction created successfully')).toHaveClass('auth-success')
     await screen.findByText('August salary')
+  })
+
+  it('shows the budget warning banner after a successful create whose response has a non-null budgetWarning', async () => {
+    await renderLoaded(emptyPage())
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    const form = formWithin()
+    fireEvent.change(form.getByLabelText('Type'), { target: { value: 'EXPENSE' } })
+    fireEvent.change(form.getByLabelText('Category'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '15000' } })
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-07-20' } })
+
+    mockRoutes({
+      transactions: (init) =>
+        init?.method === 'POST'
+          ? jsonResponse(201, {
+              id: 999,
+              type: 'EXPENSE',
+              description: null,
+              categoryId: 1,
+              categoryName: 'Groceries',
+              amount: 15000,
+              date: '2026-07-20',
+              budgetWarning: {
+                categoryId: 1,
+                categoryName: 'Groceries',
+                budgeted: 150000,
+                spent: 155000,
+                remaining: -5000,
+                percentageUsed: 103.3,
+              },
+            })
+          : jsonResponse(200, emptyPage()),
+    })
+
+    await submitForm('Create Transaction')
+
+    const warningBanner = document.querySelector('.budget-warning-banner[role="status"]')
+    expect(warningBanner).not.toBeNull()
+    expect(warningBanner).toHaveTextContent('Groceries')
+    expect(warningBanner).toHaveTextContent(huf(5000))
+  })
+
+  it('does not show the budget warning banner after a successful create whose response has a null budgetWarning', async () => {
+    await renderLoaded(emptyPage())
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    const form = formWithin()
+    fireEvent.change(form.getByLabelText('Type'), { target: { value: 'EXPENSE' } })
+    fireEvent.change(form.getByLabelText('Category'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-07-20' } })
+
+    mockRoutes({
+      transactions: (init) =>
+        init?.method === 'POST'
+          ? jsonResponse(201, {
+              id: 999,
+              type: 'EXPENSE',
+              description: null,
+              categoryId: 1,
+              categoryName: 'Groceries',
+              amount: 10,
+              date: '2026-07-20',
+              budgetWarning: null,
+            })
+          : jsonResponse(200, emptyPage()),
+    })
+
+    await submitForm('Create Transaction')
+
+    expect(document.querySelector('.budget-warning-banner')).toBeNull()
+  })
+
+  it('never shows the budget warning banner after a successful edit, even though a prior create left one visible', async () => {
+    await renderLoaded(emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 2, totalPages: 1 }))
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    const createForm = formWithin()
+    fireEvent.change(createForm.getByLabelText('Type'), { target: { value: 'EXPENSE' } })
+    fireEvent.change(createForm.getByLabelText('Category'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '15000' } })
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-07-20' } })
+
+    mockRoutes({
+      transactions: (init) =>
+        init?.method === 'POST'
+          ? jsonResponse(201, {
+              id: 999,
+              type: 'EXPENSE',
+              description: null,
+              categoryId: 1,
+              categoryName: 'Groceries',
+              amount: 15000,
+              date: '2026-07-20',
+              budgetWarning: {
+                categoryId: 1,
+                categoryName: 'Groceries',
+                budgeted: 150000,
+                spent: 155000,
+                remaining: -5000,
+                percentageUsed: 103.3,
+              },
+            })
+          : jsonResponse(200, emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 2, totalPages: 1 })),
+    })
+
+    await submitForm('Create Transaction')
+    expect(document.querySelector('.budget-warning-banner')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Groceries · Aug 14, 2026' }))
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '13000' } })
+
+    mockRoutes({
+      transactions: (init) =>
+        init?.method === 'PUT'
+          ? jsonResponse(200, { ...SAMPLE_TRANSACTIONS[1], amount: 13000 })
+          : jsonResponse(200, emptyPage({ content: SAMPLE_TRANSACTIONS, totalElements: 2, totalPages: 1 })),
+    })
+
+    await submitForm('Update Transaction')
+
+    expect(document.querySelector('.budget-warning-banner')).toBeNull()
+  })
+
+  it('clears a previously shown budget warning banner when the create form is reopened', async () => {
+    await renderLoaded(emptyPage())
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    const form = formWithin()
+    fireEvent.change(form.getByLabelText('Type'), { target: { value: 'EXPENSE' } })
+    fireEvent.change(form.getByLabelText('Category'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '15000' } })
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-07-20' } })
+
+    mockRoutes({
+      transactions: (init) =>
+        init?.method === 'POST'
+          ? jsonResponse(201, {
+              id: 999,
+              type: 'EXPENSE',
+              description: null,
+              categoryId: 1,
+              categoryName: 'Groceries',
+              amount: 15000,
+              date: '2026-07-20',
+              budgetWarning: {
+                categoryId: 1,
+                categoryName: 'Groceries',
+                budgeted: 150000,
+                spent: 155000,
+                remaining: -5000,
+                percentageUsed: 103.3,
+              },
+            })
+          : jsonResponse(200, emptyPage()),
+    })
+
+    await submitForm('Create Transaction')
+    expect(document.querySelector('.budget-warning-banner')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+
+    expect(document.querySelector('.budget-warning-banner')).toBeNull()
+  })
+
+  it('builds the exact budget warning message text from the category, month, remaining, spent, and budgeted amounts', async () => {
+    await renderLoaded(emptyPage())
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New Transaction' }))
+    const form = formWithin()
+    fireEvent.change(form.getByLabelText('Type'), { target: { value: 'EXPENSE' } })
+    fireEvent.change(form.getByLabelText('Category'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '15000' } })
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-07-20' } })
+
+    mockRoutes({
+      transactions: (init) =>
+        init?.method === 'POST'
+          ? jsonResponse(201, {
+              id: 999,
+              type: 'EXPENSE',
+              description: null,
+              categoryId: 1,
+              categoryName: 'Groceries',
+              amount: 15000,
+              date: '2026-07-20',
+              budgetWarning: {
+                categoryId: 1,
+                categoryName: 'Groceries',
+                budgeted: 150000,
+                spent: 155000,
+                remaining: -5000,
+                percentageUsed: 103.3,
+              },
+            })
+          : jsonResponse(200, emptyPage()),
+    })
+
+    await submitForm('Create Transaction')
+
+    const expected = `Heads up: this pushed Groceries over its July 2026 budget by ${huf(5000)} (${huf(155000)} spent of ${huf(150000)}).`
+    expect(document.querySelector('.budget-warning-banner')).toHaveTextContent(expected)
   })
 
   it('updates a transaction, closes the form, shows success, and reloads the same page', async () => {

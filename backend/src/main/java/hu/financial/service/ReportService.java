@@ -2,11 +2,13 @@ package hu.financial.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -152,6 +154,28 @@ public class ReportService {
                 money(totalSpent),
                 money(unbudgetedSpending),
                 categories);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<BudgetStatusItemDto> categoryBudgetStatus(Long userId, Long categoryId, YearMonth month) {
+        LocalDate start = month.atDay(1);
+        LocalDate end = month.atEndOfMonth();
+
+        Optional<CategoryBudgetTotal> budget = budgetRepository.summarizeBudgetsByCategory(userId, start, end).stream()
+                .filter(b -> b.categoryId().equals(categoryId))
+                .findFirst();
+
+        if (budget.isEmpty()) {
+            return Optional.empty();
+        }
+
+        BigDecimal spent = transactionRepository.summarizeExpensesByCategory(userId, start, end, TransactionType.EXPENSE).stream()
+                .filter(e -> e.categoryId().equals(categoryId))
+                .map(CategoryExpenseTotal::total)
+                .findFirst()
+                .orElse(BigDecimal.ZERO);
+
+        return Optional.of(statusItem(budget.get(), spent));
     }
 
     private static BudgetStatusItemDto statusItem(CategoryBudgetTotal budget, BigDecimal spent) {

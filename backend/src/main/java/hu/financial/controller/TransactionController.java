@@ -62,7 +62,7 @@ public class TransactionController {
     public ResponseEntity<TransactionResponseDto> createTransaction(@Valid @RequestBody CreateTransactionDto dto) {
         Transaction transaction = transactionService.mapToEntity(dto);
         Transaction savedTransaction = transactionService.createTransaction(transaction);
-        return ResponseEntity.status(HttpStatus.CREATED).body(transactionService.mapToDto(savedTransaction));
+        return ResponseEntity.status(HttpStatus.CREATED).body(transactionService.mapToDtoWithBudgetWarning(savedTransaction));
     }
 
     @Operation(summary = "Get the current user's transactions")

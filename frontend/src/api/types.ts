@@ -72,6 +72,7 @@ export interface TransactionResponseDto {
   categoryName: string
   amount: number
   date: string
+  budgetWarning: BudgetStatusItem | null
 }
 
 export interface CreateTransactionDto {

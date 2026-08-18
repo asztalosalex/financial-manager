@@ -28,10 +28,14 @@ import java.util.List;
 import java.util.Arrays;
 import java.util.Optional;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import hu.financial.model.enums.TransactionType;
 import hu.financial.exception.category.CategoryNotFoundException;
 import hu.financial.exception.transaction.TransactionNotFoundException;
 import hu.financial.exception.transaction.TransactionValidationException;
+import hu.financial.dto.report.BudgetStatusItemDto;
+import hu.financial.dto.transaction.TransactionResponseDto;
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 public class TransactionServiceTest {
@@ -44,6 +48,9 @@ public class TransactionServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private ReportService reportService;
 
     @InjectMocks
     private TransactionService transactionService;
@@ -251,5 +258,88 @@ public class TransactionServiceTest {
 
         assertEquals(new BigDecimal("100.00"), result.getAmount());
         assertEquals(2, result.getAmount().scale());
+    }
+
+    private static BudgetStatusItemDto statusItem(BigDecimal budgeted, BigDecimal spent, BigDecimal remaining, BigDecimal percentageUsed) {
+        return new BudgetStatusItemDto(1L, "testcategory", budgeted, spent, remaining, percentageUsed);
+    }
+
+    @Test
+    void mapToDtoWithBudgetWarning_ReturnsWarning_WhenExpenseOverspendsItsCategoryBudget() {
+        Transaction expense = new Transaction(3L, TransactionType.EXPENSE, "groceries",
+                testCategory, testUser, new BigDecimal("60.00"), LocalDate.of(2026, 7, 15));
+        BudgetStatusItemDto status = statusItem(new BigDecimal("150000.00"), new BigDecimal("162000.00"),
+                new BigDecimal("-12000.00"), new BigDecimal("108.0"));
+        when(reportService.categoryBudgetStatus(testUser.getId(), testCategory.getId(), YearMonth.of(2026, 7)))
+                .thenReturn(Optional.of(status));
+
+        TransactionResponseDto result = transactionService.mapToDtoWithBudgetWarning(expense);
+
+        assertNotNull(result.budgetWarning());
+        assertEquals(testCategory.getId(), result.budgetWarning().categoryId());
+        assertEquals(new BigDecimal("150000.00"), result.budgetWarning().budgeted());
+        assertEquals(new BigDecimal("162000.00"), result.budgetWarning().spent());
+        assertEquals(new BigDecimal("-12000.00"), result.budgetWarning().remaining());
+        assertEquals(new BigDecimal("108.0"), result.budgetWarning().percentageUsed());
+    }
+
+    @Test
+    void mapToDtoWithBudgetWarning_ReturnsNull_WhenExpenseStaysWithinItsCategoryBudget() {
+        Transaction expense = new Transaction(3L, TransactionType.EXPENSE, "groceries",
+                testCategory, testUser, new BigDecimal("10.00"), LocalDate.of(2026, 7, 15));
+        BudgetStatusItemDto status = statusItem(new BigDecimal("150000.00"), new BigDecimal("36000.00"),
+                new BigDecimal("114000.00"), new BigDecimal("24.0"));
+        when(reportService.categoryBudgetStatus(testUser.getId(), testCategory.getId(), YearMonth.of(2026, 7)))
+                .thenReturn(Optional.of(status));
+
+        TransactionResponseDto result = transactionService.mapToDtoWithBudgetWarning(expense);
+
+        assertNull(result.budgetWarning());
+    }
+
+    @Test
+    void mapToDtoWithBudgetWarning_ReturnsNull_WhenCategoryHasNoBudgetForTheMonth() {
+        Transaction expense = new Transaction(3L, TransactionType.EXPENSE, "groceries",
+                testCategory, testUser, new BigDecimal("10.00"), LocalDate.of(2026, 7, 15));
+        when(reportService.categoryBudgetStatus(testUser.getId(), testCategory.getId(), YearMonth.of(2026, 7)))
+                .thenReturn(Optional.empty());
+
+        TransactionResponseDto result = transactionService.mapToDtoWithBudgetWarning(expense);
+
+        assertNull(result.budgetWarning());
+    }
+
+    @Test
+    void mapToDtoWithBudgetWarning_ReturnsNull_AndNeverAsksReportService_WhenTransactionIsIncome() {
+        Transaction income = new Transaction(3L, TransactionType.INCOME, "salary",
+                testCategory, testUser, new BigDecimal("500000.00"), LocalDate.of(2026, 7, 15));
+
+        TransactionResponseDto result = transactionService.mapToDtoWithBudgetWarning(income);
+
+        assertNull(result.budgetWarning());
+        verify(reportService, never()).categoryBudgetStatus(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+    }
+
+    @Test
+    void mapToDtoWithBudgetWarning_QueriesTheMonthFromTheTransactionsOwnDate_NotTheServerClock() {
+        LocalDate pastDate = LocalDate.of(2019, 3, 10);
+        Transaction expense = new Transaction(3L, TransactionType.EXPENSE, "groceries",
+                testCategory, testUser, new BigDecimal("10.00"), pastDate);
+        when(reportService.categoryBudgetStatus(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+                .thenReturn(Optional.empty());
+
+        transactionService.mapToDtoWithBudgetWarning(expense);
+
+        ArgumentCaptor<YearMonth> monthCaptor = ArgumentCaptor.forClass(YearMonth.class);
+        verify(reportService).categoryBudgetStatus(eq(testUser.getId()), eq(testCategory.getId()), monthCaptor.capture());
+        assertEquals(YearMonth.of(2019, 3), monthCaptor.getValue());
+    }
+
+    @Test
+    void mapToDto_SingleArgumentOverload_AlwaysHasNullBudgetWarning_AndNeverAsksReportService() {
+        TransactionResponseDto result = transactionService.mapToDto(testTransaction);
+
+        assertNull(result.budgetWarning());
+        verify(reportService, never()).categoryBudgetStatus(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
     }
 }

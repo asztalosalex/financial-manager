@@ -11,6 +11,7 @@ const INCOME_SOURCE: TransactionResponseDto = {
   categoryName: 'Salary',
   amount: 500000,
   date: '2026-08-14',
+  budgetWarning: null,
 }
 
 const EXPENSE_SOURCE: TransactionResponseDto = {
@@ -21,6 +22,7 @@ const EXPENSE_SOURCE: TransactionResponseDto = {
   categoryName: 'Food',
   amount: 12500,
   date: '2026-08-14',
+  budgetWarning: null,
 }
 
 const INCOME_ITEM: TransactionRowItem = {

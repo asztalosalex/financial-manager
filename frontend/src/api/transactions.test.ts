@@ -15,6 +15,7 @@ const FIRST_PAGE: PageResponse<TransactionResponseDto> = {
       categoryName: 'Groceries',
       amount: 42.5,
       date: '2026-07-30',
+      budgetWarning: null,
     },
   ],
   page: 0,
@@ -186,6 +187,7 @@ describe('transactions api', () => {
       categoryName: 'Groceries',
       amount: 42.5,
       date: '2026-08-14',
+      budgetWarning: null,
     }
     respondWith(created)
     const payload: CreateTransactionDto = {
@@ -214,6 +216,7 @@ describe('transactions api', () => {
       categoryName: 'Salary',
       amount: 100000,
       date: '2026-08-01',
+      budgetWarning: null,
     }
     respondWith(updated)
     const payload: CreateTransactionDto = {

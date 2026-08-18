@@ -2,6 +2,7 @@ package hu.financial.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.YearMonth;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +18,8 @@ import hu.financial.exception.transaction.TransactionNotFoundException;
 import hu.financial.exception.transaction.TransactionValidationException;
 import hu.financial.dto.transaction.CreateTransactionDto;
 import hu.financial.dto.transaction.TransactionResponseDto;
+import hu.financial.dto.transaction.BudgetWarningDto;
+import hu.financial.model.enums.TransactionType;
 
 @Service
 public class TransactionService {
@@ -29,6 +32,9 @@ public class TransactionService {
 
   @Autowired
   private UserService userService;
+
+  @Autowired
+  private ReportService reportService;
 
   @Transactional
   public Transaction createTransaction(Transaction transaction) {
@@ -95,7 +101,15 @@ public class TransactionService {
     return transaction;
   }
 
+  public TransactionResponseDto mapToDtoWithBudgetWarning(Transaction transaction) {
+    return mapToDto(transaction, resolveBudgetWarning(transaction));
+  }
+
   public TransactionResponseDto mapToDto(Transaction transaction) {
+    return mapToDto(transaction, null);
+  }
+
+  private TransactionResponseDto mapToDto(Transaction transaction, BudgetWarningDto budgetWarning) {
     return new TransactionResponseDto(
         transaction.getId(),
         transaction.getType(),
@@ -103,7 +117,19 @@ public class TransactionService {
         transaction.getCategory().getId(),
         transaction.getCategory().getName(),
         transaction.getAmount(),
-        transaction.getDate());
+        transaction.getDate(),
+        budgetWarning);
+  }
+
+  private BudgetWarningDto resolveBudgetWarning(Transaction transaction) {
+    if (transaction.getType() != TransactionType.EXPENSE) {
+      return null;
+    }
+    YearMonth month = YearMonth.from(transaction.getDate());
+    return reportService.categoryBudgetStatus(transaction.getUser().getId(), transaction.getCategory().getId(), month)
+        .filter(status -> status.remaining().signum() < 0)
+        .map(BudgetWarningDto::from)
+        .orElse(null);
   }
 
 }

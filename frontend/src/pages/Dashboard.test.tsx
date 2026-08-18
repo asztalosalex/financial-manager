@@ -117,6 +117,7 @@ const FULL_TRANSACTIONS_PAGE: PageResponse<TransactionResponseDto> = {
       categoryName: 'Salary',
       amount: 500000,
       date: '2020-01-10',
+      budgetWarning: null,
     },
     {
       id: 102,
@@ -126,6 +127,7 @@ const FULL_TRANSACTIONS_PAGE: PageResponse<TransactionResponseDto> = {
       categoryName: 'Groceries',
       amount: 8200,
       date: '2020-01-09',
+      budgetWarning: null,
     },
   ],
   page: 0,

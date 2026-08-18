@@ -13,5 +13,6 @@ public record TransactionResponseDto(
      Long categoryId,
      String categoryName,
      BigDecimal amount,
-     LocalDate date
+     LocalDate date,
+     BudgetWarningDto budgetWarning
 ){}
