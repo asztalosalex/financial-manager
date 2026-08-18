@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: financial-manager
+  datasource:
+    url: "jdbc:postgresql://localhost:5432/${POSTGRES_DB}"
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+security:
+  jwt:
+    secret-key: ${SECURITY_JWT_SECRET_KEY}
+    expiration-time: ${SECURITY_JWT_EXPIRATION_TIME:3600}
+  cookie:
+    secure: ${SECURITY_COOKIE_SECURE:true}
+    same-site: ${SECURITY_COOKIE_SAME_SITE:Lax}
+
+springdoc:
+  swagger-ui:
+    defaultModelsExpandDepth: -1
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    show-sql: false
+
+security:
+  cookie:
+    secure: true
+    same-site: Lax
+
+logging:
+  level:
+    org.springdoc: INFO
+    org.springframework.web: INFO
