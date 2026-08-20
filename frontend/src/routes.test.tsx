@@ -321,6 +321,39 @@ describe('route structure', () => {
     expect(screen.queryByRole('button', { name: /Income & Expenses/ })).not.toBeInTheDocument()
   })
 
+  it('renders the not-found page for a signed-out visitor at an unknown address', async () => {
+    signedOut()
+
+    const router = renderAt('/does-not-exist')
+
+    expect(await screen.findByText('404')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Page not found' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/does-not-exist')
+    expect(screen.queryByRole('heading', { level: 2, name: 'Log in' })).not.toBeInTheDocument()
+  })
+
+  it('renders the not-found page for a signed-in visitor at an unknown address, outside the app shell', async () => {
+    signedIn()
+
+    const router = renderAt('/does-not-exist')
+
+    expect(await screen.findByText('404')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/does-not-exist')
+    expect(screen.queryByRole('navigation', { name: 'Main navigation' })).not.toBeInTheDocument()
+    expect(document.querySelector('.shell-layout')).toBeNull()
+    expect(headerIsRendered()).toBe(false)
+    expect(footerIsRendered()).toBe(false)
+  })
+
+  it('links back to the homepage from the not-found page', async () => {
+    signedOut()
+
+    renderAt('/does-not-exist')
+
+    const link = await screen.findByRole('link', { name: 'Back to homepage' })
+    expect(link).toHaveAttribute('href', '/')
+  })
+
   it('swaps the main content but keeps the shell when a nav item is clicked', async () => {
     signedIn()
 

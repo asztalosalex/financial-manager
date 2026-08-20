@@ -8,10 +8,10 @@
 		<version>3.2.5</version>
 		<relativePath/>
 	</parent>
-	<groupId>hu.financial</groupId>
-	<artifactId>demo</artifactId>
+	<groupId>hu.alex-asztalos</groupId>
+	<artifactId>financial-manager</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>demo</name>
+	<name>Financial Manager</name>
 	<description>Personal Finance Manager backend</description>
 	<url/>
 	<licenses>

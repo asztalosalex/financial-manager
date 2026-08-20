@@ -12,6 +12,7 @@ import Categories from './pages/Categories'
 import Budgets from './pages/Budgets'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import NotFound from './pages/NotFound'
 
 export const routes: RouteObject[] = [
   {
@@ -42,7 +43,8 @@ export const routes: RouteObject[] = [
             ]
           }
         ]
-      }
+      },
+      { path: '*', element: <NotFound /> }
     ]
   }
 ]
