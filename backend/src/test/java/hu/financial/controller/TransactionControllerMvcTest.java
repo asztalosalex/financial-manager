@@ -1,6 +1,7 @@
 package hu.financial.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import hu.financial.config.FilterRegistrationConfig;
 import hu.financial.config.SecurityConfig;
 import hu.financial.dto.transaction.CreateTransactionDto;
 import hu.financial.filter.JwtAuthenticationFilter;
@@ -28,8 +29,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -66,7 +68,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(TransactionController.class)
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class, CookieProperties.class, RestAccessDeniedHandler.class,
         SecurityCookieFactory.class, CsrfCookieFilter.class, JwtService.class, TransactionService.class,
-        CategoryService.class, ReportService.class })
+        CategoryService.class, ReportService.class, FilterRegistrationConfig.class })
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
         "security.jwt.expiration-time=3600",
@@ -91,16 +93,16 @@ class TransactionControllerMvcTest {
     @Autowired
     private JwtService jwtService;
 
-    @MockBean
+    @MockitoBean
     private UserService userService;
 
-    @MockBean
+    @MockitoBean
     private TransactionRepository transactionRepository;
 
-    @MockBean
+    @MockitoBean
     private CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     private BudgetRepository budgetRepository;
 
     private User currentUser;

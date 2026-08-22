@@ -26,7 +26,7 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
@@ -45,9 +45,9 @@ public class SecurityConfig {
                 .csrfTokenRepository(securityCookieFactory.csrfTokenRepository())
                 .csrfTokenRequestHandler(csrfTokenRequestHandler())
                 .ignoringRequestMatchers(
-                        new AntPathRequestMatcher("/api/auth/login", HttpMethod.POST.name()),
-                        new AntPathRequestMatcher("/api/auth/signup", HttpMethod.POST.name()),
-                        new AntPathRequestMatcher("/api/auth/logout", HttpMethod.POST.name())))
+                        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/auth/login"),
+                        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/auth/signup"),
+                        PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/auth/logout")))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/").permitAll()
                         .requestMatchers("/admin/**").hasAnyRole("ADMIN")
@@ -81,8 +81,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationProvider authenticationProvider(UserDetailsService userDetailsService,
             PasswordEncoder passwordEncoder) {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService);
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
         return provider;
     }

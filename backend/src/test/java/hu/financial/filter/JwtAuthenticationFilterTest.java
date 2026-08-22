@@ -96,7 +96,8 @@ class JwtAuthenticationFilterTest {
     @Test
     void doFilter_ShouldSwallowParsingFailure_ButStillContinueTheChain() throws Exception {
         request.setCookies(new Cookie("authToken", "broken"));
-        when(jwtService.extractUsername("broken")).thenThrow(new IllegalStateException("malformed token"));
+        when(jwtService.extractUsername("broken"))
+                .thenThrow(new io.jsonwebtoken.MalformedJwtException("malformed token"));
 
         filter.doFilter(request, response, filterChain);
 

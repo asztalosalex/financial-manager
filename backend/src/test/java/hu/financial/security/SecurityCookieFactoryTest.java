@@ -113,7 +113,6 @@ class SecurityCookieFactoryTest {
 
     @Test
     void csrfTokenRepository_ShouldStillDeleteTheCookie_WhenTheTokenIsCleared() {
-        when(jwtService.getExpirationTime()).thenReturn(3600L);
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
