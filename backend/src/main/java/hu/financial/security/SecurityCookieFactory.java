@@ -35,9 +35,12 @@ public class SecurityCookieFactory {
     public CookieCsrfTokenRepository csrfTokenRepository() {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repository.setCookiePath("/");
-        repository.setSecure(cookieProperties.isSecure());
-        repository.setCookieMaxAge((int) lifetime().getSeconds());
-        repository.setCookieCustomizer(builder -> builder.sameSite(cookieProperties.getSameSite()));
+        repository.setCookieCustomizer(builder -> {
+            boolean clearing = builder.build().getValue().isEmpty();
+            builder.secure(cookieProperties.isSecure())
+            .sameSite(cookieProperties.getSameSite())
+            .maxAge(clearing ? Duration.ZERO : lifetime());
+        });
         return repository;
     }
 

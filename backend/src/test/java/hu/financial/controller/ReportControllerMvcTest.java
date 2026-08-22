@@ -9,14 +9,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import hu.financial.config.FilterRegistrationConfig;
 import hu.financial.config.SecurityConfig;
 import hu.financial.filter.JwtAuthenticationFilter;
 import hu.financial.model.User;
@@ -52,7 +54,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ReportController.class)
 @Import({ SecurityConfig.class, JwtAuthenticationFilter.class, CookieProperties.class, RestAccessDeniedHandler.class,
-        SecurityCookieFactory.class, CsrfCookieFilter.class, JwtService.class, ReportService.class })
+        SecurityCookieFactory.class, CsrfCookieFilter.class, JwtService.class, ReportService.class,
+        FilterRegistrationConfig.class })
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
         "security.jwt.expiration-time=3600",
@@ -69,13 +72,13 @@ class ReportControllerMvcTest {
     @Autowired
     private JwtService jwtService;
 
-    @MockBean
+    @MockitoBean
     private UserService userService;
 
-    @MockBean
+    @MockitoBean
     private TransactionRepository transactionRepository;
 
-    @MockBean
+    @MockitoBean
     private BudgetRepository budgetRepository;
 
     private User currentUser;
